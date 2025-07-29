@@ -1,1 +1,9 @@
+# Dependency and Build Artifacts
 node_modules/
+dist/
+*.exe
+*.log
+
+
+# Configuration and Secrets
+.env

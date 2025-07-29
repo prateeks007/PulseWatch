@@ -3,8 +3,8 @@ package services
 import (
 	"net/http"
 	"time"
-	
-	"monitor/models"
+
+	"github.com/prateeks007/PulseWatch/monitor/backend/models"
 )
 
 // MonitorService checks websites
@@ -25,32 +25,32 @@ func NewMonitorService() *MonitorService {
 func (s *MonitorService) CheckWebsite(website models.Website) (models.WebsiteStatus, error) {
 	// Record when we started
 	startTime := time.Now()
-	
+
 	// Try to access the website
 	resp, err := s.client.Get(website.URL)
-	
+
 	// Calculate how long it took
 	responseTime := time.Since(startTime).Milliseconds()
-	
+
 	// Create a status object
 	status := models.WebsiteStatus{
 		WebsiteID:    website.ID,
 		CheckedAt:    time.Now().Unix(),
 		ResponseTime: responseTime,
 	}
-	
+
 	// If there was an error, the site is down
 	if err != nil {
 		status.IsUp = false
 		return status, err
 	}
 	defer resp.Body.Close() // Always close the response
-	
+
 	// Record the HTTP status code
 	status.StatusCode = resp.StatusCode
-	
+
 	// Site is "up" if status code is 200-399
 	status.IsUp = resp.StatusCode >= 200 && resp.StatusCode < 400
-	
+
 	return status, nil
 }

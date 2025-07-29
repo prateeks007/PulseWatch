@@ -11,6 +11,7 @@ PulseWatch is a lightweight yet powerful website uptime and health monitor built
 * 💡 Pluggable storage (easily extend to Redis, SQL, etc.)
 * 📈 Real-time console logs
 * 🧰 Future-ready for dashboard and alerting integrations
+* 📁 Frontend for a live dashboard
 
 ---
 
@@ -18,7 +19,7 @@ PulseWatch is a lightweight yet powerful website uptime and health monitor built
 
 * Go 1.18+
 * MongoDB Atlas (Free Tier is fine)
-* Node.js (Optional - for front-end if enabled)
+* Node.js (for the frontend)
 
 ---
 
@@ -27,96 +28,92 @@ PulseWatch is a lightweight yet powerful website uptime and health monitor built
 ### 1. Clone the Repo
 
 ```bash
-git clone https://github.com/prateeks007/PulseWatch.git
+git clone [https://github.com/prateeks007/PulseWatch.git](https://github.com/prateeks007/PulseWatch.git)
 cd PulseWatch
-```
+````
 
-### 2. Setup MongoDB Atlas
+### 2\. Setup MongoDB Atlas
 
-* Create a free cluster: [https://cloud.mongodb.com](https://cloud.mongodb.com)
+  * Create a free cluster: [https://cloud.mongodb.com](https://cloud.mongodb.com)
 
-* Add a user & whitelist your IP
+  * Add a user and whitelist your IP.
 
-* Copy your connection string:
+  * Copy your connection string. It should look something like this:
 
-  ```
-  mongodb+srv://<user>:<pass>@cluster0.mongodb.net/pulsewatch?retryWrites=true&w=majority
-  ```
+  `  mongodb+srv://<user>:<pass>@cluster0.mongodb.net/pulsewatch?retryWrites=true&w=majority  `
 
-* Export the connection string:
+  * Create a `.env` file in the root of the project to store your connection details:
 
-```bash
-export MONGODB_URI="your-connection-uri"
-```
+  ` env   MONGO_URI="your-connection-uri"   MONGO_DB_NAME="pulsewatch_db"    `
 
-### 3. Build the App
+  * **Note:** The `pulsewatch_db` database and its collections will be automatically created on the first run.
 
-```bash
-go mod tidy
-go build -o pulsewatch main.go cron_monitor.go
-```
+### 3\. Setup and Run the Backend
 
-### 4. Run the App
+The backend is located in the `monitor/backend` directory, but the main entry point is at the project root.
 
-```bash
-./pulsewatch
-```
+  * Download the Go dependencies from the project root:
+      ` bash   go mod tidy    `
 
-* Default config will be created (Google monitored every 60s).
+  * Build the backend executable from the project root:
+      ` bash   go build -o pulsewatch-api ./monitor/backend    `
 
----
+  * Run the backend server from the project root:
+      ` bash   ./pulsewatch-api    `
 
-## 🧪 Example CLI Usage *(to be implemented)*
+  * This will start the cron scheduler and the API server on `http://localhost:3000`.
 
-```bash
-# Add a new site
-./pulsewatch add --name "My Blog" --url "https://example.com" --interval 120
+### 4\. Setup and Run the Frontend
 
-# List all sites
-./pulsewatch list
+  * Navigate to the frontend directory:
+      ` bash   cd monitor/frontend    `
 
-# Remove site by ID
-./pulsewatch remove --id <ObjectID>
-```
+  * Install the Node.js dependencies:
+      ` bash   npm install    `
 
----
+  * Run the frontend development server:
+      ` bash   npm run dev    `
+
+  * This will open your web browser to the frontend dashboard, which will communicate with your backend API.
+
+-----
 
 ## 🧩 Architecture
 
 ```
-[ CLI / Web UI (optional) ]
-        |
-[ Core Layer: MonitorService ]
-        |
-[ StorageService Interface ]
-   ├── MongoStorage
-   └── (Future) FileStorage, RedisStorage
-        |
-[ Data: MongoDB Atlas ]
+[ Frontend (Web UI) ] ----API Calls----> [ Go Backend (Fiber API) ]
+                               |
+                              [ MonitorService ]
+                               |
+                              [ StorageService ]
+                               |
+                           [ Data: MongoDB Atlas ]
 ```
 
-* All storage is handled through an interface.
-* MongoDB used as primary backend.
-* Cron scheduler executes MonitorService checks per interval.
+  * All storage is handled through an interface.
+  * MongoDB is used as the primary backend for data persistence.
+  * A cron scheduler runs periodic checks via the `MonitorService`.
 
----
+-----
 
 ## 📈 Future Plans
 
-* Web dashboard with charts
-* Alerting: Email, Slack, SMS
-* User authentication (multi-tenant)
-* Docker + Helm deployment
-* Prometheus + Grafana exporter
+  * Web dashboard with charts
+  * Alerting: Email, Slack, SMS
+  * User authentication (multi-tenant)
+  * Docker + Helm deployment
+  * Prometheus + Grafana exporter
 
----
+-----
 
 ## 🤝 Contributing
 
 Pull requests are welcome. Open issues for bugs or features.
 
----
+-----
 
 ## 📜 License
 
-[MIT License](LICENSE)
+[MIT License](https://www.google.com/search?q=LICENSE)
+
+```

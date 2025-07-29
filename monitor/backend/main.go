@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"monitor/models"
-	"monitor/services"
+	"github.com/prateeks007/PulseWatch/monitor/backend/models"
+	"github.com/prateeks007/PulseWatch/monitor/backend/services"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
