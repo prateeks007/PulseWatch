@@ -22,6 +22,11 @@ function App() {
   });
   const [showSummary, setShowSummary] = useState(true);
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+// console.log("Base URL:", import.meta.env.VITE_API_BASE_URL);
+
+
+
   const debouncedSetFilters = useCallback(
     debounce((newFilters) => {
       setFilters(newFilters);
@@ -36,12 +41,14 @@ function App() {
   // Keep your original fetching logic
   const fetchWebsites = async () => {
     try {
-      const response = await axios.get('http://localhost:3000/api/websites');
+      const response = await axios.get(`${API_BASE_URL}/api/websites`);
+      // console.log("API response:", response.data);
+
       
       const websitesWithStatus = await Promise.all(
         response.data.map(async (website) => {
           try {
-            const statusResponse = await axios.get(`http://localhost:3000/api/websites/${website.id}/status`);
+            const statusResponse = await axios.get(`${API_BASE_URL}/api/websites/${website.id}/status`);
             
             if (statusResponse.data && statusResponse.data.length > 0) {
               return {
@@ -73,7 +80,7 @@ function App() {
 
   const fetchStatuses = async (websiteId) => {
     try {
-      const response = await axios.get(`http://localhost:3000/api/websites/${websiteId}/status`);
+      const response = await axios.get(`${API_BASE_URL}/api/websites/${websiteId}/status`);
       setStatuses(response.data);
     } catch (err) {
       console.error(`Error fetching statuses for website ${websiteId}:`, err);
