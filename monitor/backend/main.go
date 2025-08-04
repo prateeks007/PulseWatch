@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/prateeks007/PulseWatch/monitor/backend/models"
@@ -150,9 +151,16 @@ func main() {
 	})
 
 	// Start the API server in a separate goroutine
+
 	go func() {
-		fmt.Println("Starting API server on http://localhost:3000")
-		if err := app.Listen(":3000"); err != nil {
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "3000" // fallback for local dev
+		}
+		addr := "0.0.0.0:" + port
+
+		fmt.Printf("Starting API server on http://%s\n", addr)
+		if err := app.Listen(addr); err != nil {
 			fmt.Printf("API server error: %v\n", err)
 		}
 	}()
