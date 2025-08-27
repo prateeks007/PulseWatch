@@ -199,5 +199,30 @@ func (s *StorageService) LoadFromFiles() error {
 	return nil
 }
 
+// DeleteWebsite removes a website and its statuses from MongoDB.
+func (s *StorageService) DeleteWebsite(id string) error {
+	if err := s.client.Ping(context.TODO(), readpref.Primary()); err != nil {
+		return fmt.Errorf("StorageService: MongoDB connection lost, unable to delete website: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Delete the website doc
+	_, err := s.websitesColl.DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		return fmt.Errorf("StorageService: failed to delete website %s: %w", id, err)
+	}
+
+	// Optionally: also delete all statuses for that website
+	_, err = s.statusesColl.DeleteMany(ctx, bson.M{"website_id": id})
+	if err != nil {
+		return fmt.Errorf("StorageService: failed to delete statuses for website %s: %w", id, err)
+	}
+
+	log.Printf("StorageService: Website %s deleted.", id)
+	return nil
+}
+
 // --- The original JSON-specific file methods are now removed ---
 // saveWebsitesToFile() and saveStatusesToFile() are no longer part of this StorageService.

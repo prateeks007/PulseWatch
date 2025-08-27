@@ -150,6 +150,37 @@ func main() {
 		return c.JSON(formattedStatuses)
 	})
 
+	// Add a new website
+	app.Post("/api/websites", func(c *fiber.Ctx) error {
+		var website models.Website
+		if err := c.BodyParser(&website); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		}
+
+		// Generate ID if missing
+		if website.ID == "" {
+			website.ID = fmt.Sprintf("%d", time.Now().UnixNano())
+		}
+		if website.Interval == 0 {
+			website.Interval = 60
+		}
+
+		if err := storageService.SaveWebsite(website); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to save website"})
+		}
+
+		return c.Status(201).JSON(website)
+	})
+
+	// Delete a website
+	app.Delete("/api/websites/:id", func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		if err := storageService.DeleteWebsite(id); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to delete website"})
+		}
+		return c.JSON(fiber.Map{"success": true})
+	})
+
 	// Start the API server in a separate goroutine
 
 	go func() {

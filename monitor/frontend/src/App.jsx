@@ -42,7 +42,7 @@ function App() {
     debouncedSetFilters(newFilters);
   }, [debouncedSetFilters]);
 
-  // Fetch websites and statuses
+  // ---------- API helpers ----------
   const fetchWebsites = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/websites`);
@@ -54,7 +54,6 @@ function App() {
         response.data.map(async (website) => {
           try {
             const statusResponse = await axios.get(`${API_BASE_URL}/api/websites/${website.id}/status`);
-
             if (statusResponse.data && statusResponse.data.length > 0) {
               const latest = statusResponse.data[0];
               latestStatuses.push(latest);
@@ -67,7 +66,6 @@ function App() {
                 last10Statuses: slice.slice(0, 10),
               };
             }
-
             nextStatusesByWebsite[website.id] = [];
             return website;
           } catch (err) {
@@ -102,6 +100,57 @@ function App() {
       console.error(`Error fetching statuses for website ${websiteId}:`, err);
     }
   };
+
+  const addWebsite = async ({ name, url }) => {
+    try {
+      // Basic normalization: ensure URL has protocol
+      const normalizedUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+      const res = await axios.post(`${API_BASE_URL}/api/websites`, { name, url: normalizedUrl });
+      const created = res.data; // expect { id, name, url, ... }
+
+      addToast('Website added ✅', 'success');
+
+      // Optimistically add to list
+      setWebsites((prev) => [
+        ...prev,
+        { ...created, lastStatus: undefined, last10Statuses: [] },
+      ]);
+
+      // Select it & fetch statuses
+      setSelectedWebsite(created);
+      fetchStatuses(created.id);
+
+      // Refresh full list in background (to pull computed fields)
+      fetchWebsites();
+    } catch (err) {
+      console.error('Add website failed:', err);
+      addToast('Failed to add website ❌', 'error');
+      throw err;
+    }
+  };
+
+  const deleteWebsite = async (website) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/api/websites/${website.id}`);
+      // Update UI
+      setWebsites((prev) => prev.filter((w) => w.id !== website.id));
+      setStatusesByWebsite((prev) => {
+        const copy = { ...prev };
+        delete copy[website.id];
+        return copy;
+      });
+      if (selectedWebsite?.id === website.id) {
+        setSelectedWebsite(null);
+        setStatuses([]);
+      }
+      addToast('Website deleted ❌', 'error');
+    } catch (err) {
+      console.error('Delete website failed:', err);
+      addToast('Failed to delete website ❌', 'error');
+      throw err;
+    }
+  };
+  // ---------- /API helpers ----------
 
   useEffect(() => {
     fetchWebsites();
@@ -261,10 +310,13 @@ function App() {
       <AddWebsiteModal
         open={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onSubmit={(data) => {
-          console.log("Form submitted:", data);
-          addToast("Website added ✅", "success");
-          setShowAddModal(false);
+        onSubmit={async (data) => {
+          try {
+            await addWebsite(data);
+            setShowAddModal(false);
+          } catch {
+            // toast already shown in addWebsite
+          }
         }}
       />
 
@@ -276,12 +328,13 @@ function App() {
           setShowDeleteModal(false);
           setWebsiteToDelete(null);
         }}
-        onConfirm={(w) => {
-          console.log("Delete confirmed:", w);
-          setWebsites((prev) => prev.filter((site) => site.id !== w.id));
-          addToast("Website deleted ❌", "error");
-          setShowDeleteModal(false);
-          setWebsiteToDelete(null);
+        onConfirm={async (w) => {
+          try {
+            await deleteWebsite(w);
+          } finally {
+            setShowDeleteModal(false);
+            setWebsiteToDelete(null);
+          }
         }}
       />
     </div>
