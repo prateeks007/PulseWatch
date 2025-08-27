@@ -2,225 +2,143 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"time"
 
-	"github.com/joho/godotenv"                                 // For loading .env files
-	"github.com/prateeks007/PulseWatch/monitor/backend/models" // Your models
+	"github.com/joho/godotenv"
+	"github.com/prateeks007/PulseWatch/monitor/backend/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-// StorageService handles data storage using MongoDB
 type StorageService struct {
 	client       *mongo.Client
 	websitesColl *mongo.Collection
 	statusesColl *mongo.Collection
-	databaseName string // Store the database name
-	mongoURI     string // Store the URI (for internal reference)
+	sslColl      *mongo.Collection
+	databaseName string
+	mongoURI     string
 }
 
-// NewStorageService creates a new MongoDB-backed storage service.
-// It loads the MongoDB URI from environment variables or a .env file and connects.
 func NewStorageService() *StorageService {
-	// Load .env file from the project root (PULSEWATCH/)
-	err := godotenv.Load() // Loads .env from current working directory or finds it in parent
-	if err != nil {
-		log.Printf("Warning: No .env file found or error loading .env: %v. Assuming environment variables are set directly.", err)
-	}
-
-	uri := os.Getenv("MONGO_URI") // Expecting this from .env or system env
+	_ = godotenv.Load()
+	uri := os.Getenv("MONGO_URI")
 	dbName := os.Getenv("MONGO_DB_NAME")
 	if dbName == "" {
-		dbName = "pulsewatch_db" // Default database name if not set
+		dbName = "pulsewatch_db"
 	}
-
 	if uri == "" {
-		log.Fatalf("Fatal Error: MONGO_URI environment variable is not set. Cannot initialize StorageService. Please create a .env file in the root directory or set the environment variable.")
+		log.Fatalf("MONGO_URI not set")
 	}
-
-	s := &StorageService{
-		mongoURI:     uri,
-		databaseName: dbName,
-	}
-
+	s := &StorageService{mongoURI: uri, databaseName: dbName}
 	if err := s.ConnectMongoDB(uri, dbName); err != nil {
-		log.Fatalf("Fatal Error: Failed to connect to MongoDB during StorageService initialization: %v", err)
+		log.Fatalf("Failed to connect Mongo: %v", err)
 	}
-
 	return s
 }
 
-// ConnectMongoDB establishes a connection to the MongoDB Atlas cluster.
 func (s *StorageService) ConnectMongoDB(uri, dbName string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second) // Increased timeout slightly
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-
 	clientOptions := options.Client().ApplyURI(uri)
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
-		return fmt.Errorf("failed to create MongoDB client: %w", err)
+		return err
 	}
-
-	// Ping the primary to ensure connection is established
 	if err = client.Ping(ctx, readpref.Primary()); err != nil {
-		if dcErr := client.Disconnect(context.Background()); dcErr != nil {
-			log.Printf("Error during disconnect after ping failure: %v", dcErr)
-		}
-		return fmt.Errorf("failed to ping MongoDB: %w", err)
+		return err
 	}
-
 	s.client = client
-	s.databaseName = dbName
-	s.mongoURI = uri
-	s.websitesColl = client.Database(dbName).Collection("websites")
-	s.statusesColl = client.Database(dbName).Collection("statuses")
-
-	log.Println("StorageService: Successfully connected to MongoDB Atlas!")
+	db := client.Database(dbName)
+	s.websitesColl = db.Collection("websites")
+	s.statusesColl = db.Collection("statuses")
+	s.sslColl = db.Collection("ssl")
+	log.Println("Connected to Mongo!")
 	return nil
 }
 
-// CloseMongoDB closes the MongoDB client connection. Call this on application shutdown.
-func (s *StorageService) CloseMongoDB() {
-	if s.client != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := s.client.Disconnect(ctx); err != nil {
-			log.Printf("StorageService: Error disconnecting from MongoDB: %v", err)
-		} else {
-			log.Println("StorageService: Disconnected from MongoDB Atlas.")
-		}
-	}
-}
-
-// GetWebsites returns all websites from MongoDB.
 func (s *StorageService) GetWebsites() []models.Website {
-	if err := s.client.Ping(context.TODO(), readpref.Primary()); err != nil {
-		log.Printf("StorageService: MongoDB connection lost, unable to get websites: %v", err)
-		return nil
-	}
-
-	var websites []models.Website
+	var sites []models.Website
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 	cursor, err := s.websitesColl.Find(ctx, bson.M{})
 	if err != nil {
-		log.Printf("StorageService: Error getting websites from MongoDB: %v", err)
 		return nil
 	}
-	defer cursor.Close(ctx)
-
-	if err = cursor.All(ctx, &websites); err != nil {
-		log.Printf("StorageService: Error decoding websites from MongoDB cursor: %v", err)
-		return nil
-	}
-	return websites
+	_ = cursor.All(ctx, &sites)
+	return sites
 }
 
-// SaveWebsite adds or updates a website in MongoDB.
 func (s *StorageService) SaveWebsite(website models.Website) error {
-	if err := s.client.Ping(context.TODO(), readpref.Primary()); err != nil {
-		return fmt.Errorf("StorageService: MongoDB connection lost, unable to save website: %w", err)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := s.websitesColl.UpdateOne(ctx,
+		bson.M{"_id": website.ID},
+		bson.M{"$set": website},
+		options.Update().SetUpsert(true))
+	return err
+}
 
+func (s *StorageService) SaveStatus(status models.WebsiteStatus) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	filter := bson.M{"_id": website.ID} // Use _id for MongoDB's primary key
-	update := bson.M{"$set": website}
-	opts := options.Update().SetUpsert(true) // Insert if not found, update if found
-
-	_, err := s.websitesColl.UpdateOne(ctx, filter, update, opts)
-	if err != nil {
-		return fmt.Errorf("StorageService: failed to save/update website in MongoDB: %w", err)
+	// also add CheckedAtDate for TTL
+	doc := bson.M{
+		"website_id":       status.WebsiteID,
+		"is_up":            status.IsUp,
+		"status_code":      status.StatusCode,
+		"response_time_ms": status.ResponseTime,
+		"checked_at":       status.CheckedAt,
+		"checked_at_date":  time.Unix(status.CheckedAt, 0),
 	}
-	log.Printf("StorageService: Website '%s' saved/updated.", website.Name)
-	return nil
+	_, err := s.statusesColl.InsertOne(ctx, doc)
+	return err
 }
 
-// GetWebsiteStatuses returns recent statuses for a given website ID from MongoDB.
-// It retrieves up to the last 100 statuses, sorted by CheckedAt descending.
 func (s *StorageService) GetWebsiteStatuses(websiteID string) []models.WebsiteStatus {
-	if err := s.client.Ping(context.TODO(), readpref.Primary()); err != nil {
-		log.Printf("StorageService: MongoDB connection lost, unable to get statuses: %v", err)
-		return nil
-	}
-
 	var statuses []models.WebsiteStatus
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	filter := bson.M{"website_id": websiteID}
-	opts := options.Find().SetSort(bson.D{{Key: "checked_at", Value: -1}}).SetLimit(100) // Sort by timestamp descending, limit to 100
-
-	cursor, err := s.statusesColl.Find(ctx, filter, opts)
-	if err != nil {
-		log.Printf("StorageService: Error getting statuses for website %s from MongoDB: %v", websiteID, err)
-		return nil
-	}
-	defer cursor.Close(ctx)
-
-	if err = cursor.All(ctx, &statuses); err != nil {
-		log.Printf("StorageService: Error decoding statuses for website %s from MongoDB cursor: %v", websiteID, err)
-		return nil
-	}
+	cursor, _ := s.statusesColl.Find(ctx,
+		bson.M{"website_id": websiteID},
+		options.Find().SetSort(bson.D{{Key: "checked_at", Value: -1}}).SetLimit(500),
+	)
+	_ = cursor.All(ctx, &statuses)
 	return statuses
 }
 
-// SaveStatus saves a website status to MongoDB.
-func (s *StorageService) SaveStatus(status models.WebsiteStatus) error {
-	if err := s.client.Ping(context.TODO(), readpref.Primary()); err != nil {
-		return fmt.Errorf("StorageService: MongoDB connection lost, unable to save status: %w", err)
-	}
-
+// SSL methods (same as before)
+func (s *StorageService) SaveSSL(info models.SSLInfo) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	_, err := s.sslColl.UpdateOne(ctx,
+		bson.M{"website_id": info.WebsiteID},
+		bson.M{"$set": info},
+		options.Update().SetUpsert(true))
+	return err
+}
 
-	_, err := s.statusesColl.InsertOne(ctx, status)
+func (s *StorageService) GetSSL(websiteID string) *models.SSLInfo {
+	var out models.SSLInfo
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := s.sslColl.FindOne(ctx, bson.M{"website_id": websiteID}).Decode(&out)
 	if err != nil {
-		return fmt.Errorf("StorageService: failed to save status in MongoDB: %w", err)
+		return nil
 	}
-	// log.Printf("StorageService: Status saved for website ID: %s", status.WebsiteID) // Can be noisy
-	return nil
+	return &out
 }
 
-// LoadFromFiles is adapted for MongoDB. It will no longer load from JSON files.
-// It will simply log a message, assuming data is now managed in the database.
-func (s *StorageService) LoadFromFiles() error {
-	log.Println("StorageService: LoadFromFiles called. Using MongoDB; JSON file loading is now deprecated.")
-	// You might add logic here in the future to:
-	// 1. Check if the database has any initial websites.
-	// 2. If not, insert some default websites into the DB.
-	return nil
-}
-
-// DeleteWebsite removes a website and its statuses from MongoDB.
 func (s *StorageService) DeleteWebsite(id string) error {
-	if err := s.client.Ping(context.TODO(), readpref.Primary()); err != nil {
-		return fmt.Errorf("StorageService: MongoDB connection lost, unable to delete website: %w", err)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	// Delete the website doc
-	_, err := s.websitesColl.DeleteOne(ctx, bson.M{"_id": id})
-	if err != nil {
-		return fmt.Errorf("StorageService: failed to delete website %s: %w", id, err)
-	}
-
-	// Optionally: also delete all statuses for that website
-	_, err = s.statusesColl.DeleteMany(ctx, bson.M{"website_id": id})
-	if err != nil {
-		return fmt.Errorf("StorageService: failed to delete statuses for website %s: %w", id, err)
-	}
-
-	log.Printf("StorageService: Website %s deleted.", id)
+	_, _ = s.websitesColl.DeleteOne(ctx, bson.M{"_id": id})
+	_, _ = s.statusesColl.DeleteMany(ctx, bson.M{"website_id": id})
+	_, _ = s.sslColl.DeleteOne(ctx, bson.M{"website_id": id})
 	return nil
 }
 

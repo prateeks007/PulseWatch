@@ -7,6 +7,7 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  ReferenceArea,
 } from "recharts";
 import { ThemeContext } from "../context/ThemeContext";
 
@@ -22,6 +23,7 @@ export default function StatusChart({ statuses, rangeHours = 3 }) {
     let recent = sorted.filter((s) => s.checked_at * 1000 >= cutoffMs);
     if (recent.length === 0) recent = sorted.slice(-100);
 
+    // Map into chart data
     return recent.map((s) => ({
       ts: s.checked_at * 1000,
       response: s.is_up ? s.response_time_ms : null,
@@ -30,7 +32,26 @@ export default function StatusChart({ statuses, rangeHours = 3 }) {
     }));
   }, [statuses, rangeHours]);
 
-  const gridColor = darkMode ? "rgba(0,0,0,0.18)" : "rgba(0,0,0,0.06)"; // subtle difference
+  // Build downtime ranges for shading
+  const downtimeRanges = useMemo(() => {
+    const ranges = [];
+    let currentStart = null;
+    data.forEach((point, idx) => {
+      if (!point.is_up && currentStart === null) {
+        currentStart = point.ts;
+      }
+      if (point.is_up && currentStart !== null) {
+        ranges.push([currentStart, point.ts]);
+        currentStart = null;
+      }
+    });
+    if (currentStart !== null) {
+      ranges.push([currentStart, data[data.length - 1].ts]);
+    }
+    return ranges;
+  }, [data]);
+
+  const gridColor = darkMode ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
   const tickColor = darkMode ? "#E5E7EB" : "#374151";
   const lineColor = darkMode ? "#60A5FA" : "#2563EB";
 
@@ -59,6 +80,19 @@ export default function StatusChart({ statuses, rangeHours = 3 }) {
               <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
             </linearGradient>
           </defs>
+
+          {/* Shade downtime ranges */}
+          {downtimeRanges.map(([start, end], i) => (
+            <ReferenceArea
+              key={i}
+              x1={start}
+              x2={end}
+              y1={0}
+              y2="auto"
+              fill="rgba(255,0,0,0.08)"
+              stroke="none"
+            />
+          ))}
 
           <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
 
@@ -91,7 +125,11 @@ export default function StatusChart({ statuses, rangeHours = 3 }) {
               boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
             }}
             labelFormatter={(ts) => new Date(ts).toLocaleString()}
-            formatter={(value) => (value == null ? ["Offline", "Status"] : [`${value} ms`, "Response"])}
+            formatter={(value, _, obj) =>
+              value == null
+                ? ["Offline", "Status"]
+                : [`${value} ms`, "Response"]
+            }
           />
 
           <Line

@@ -3,8 +3,14 @@ import React, { useContext, useMemo } from "react";
 import { ThemeContext } from "../context/ThemeContext";
 import TimeRangeToggle from "./TimeRangeToggle";
 import StatusChart from "./StatusChart";
+import SSLCard from "./SSLCard";
 
-export default function WebsiteDetailsCard({ website, statuses, rangeHours = 3, onChangeRangeHours }) {
+export default function WebsiteDetailsCard({
+  website,
+  statuses,
+  rangeHours = 3,
+  onChangeRangeHours,
+}) {
   const { darkMode } = useContext(ThemeContext);
 
   const safeStatuses = Array.isArray(statuses) ? statuses.filter(Boolean) : [];
@@ -82,7 +88,10 @@ export default function WebsiteDetailsCard({ website, statuses, rangeHours = 3, 
             />
             {isOnline ? "Online" : "Offline"}
           </span>
-          <TimeRangeToggle valueHours={rangeHours} onChange={onChangeRangeHours} />
+          <TimeRangeToggle
+            valueHours={rangeHours}
+            onChange={onChangeRangeHours}
+          />
         </div>
       </div>
 
@@ -112,10 +121,19 @@ export default function WebsiteDetailsCard({ website, statuses, rangeHours = 3, 
         </div>
       </div>
 
-      <div className={darkMode ? "text-white font-semibold mb-2" : "text-gray-900 font-semibold mb-2"}>
+      <div
+        className={
+          darkMode
+            ? "text-white font-semibold mb-2"
+            : "text-gray-900 font-semibold mb-2"
+        }
+      >
         Response Time History
       </div>
       <StatusChart statuses={safeStatuses} rangeHours={rangeHours} />
+      <div className="mt-4">
+        <SSLCard website={website} />
+      </div>
     </div>
   );
 }

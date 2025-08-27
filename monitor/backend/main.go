@@ -17,11 +17,12 @@ func main() {
 	// Initialize services
 	storageService := services.NewStorageService()
 	monitorService := services.NewMonitorService()
+	sslService := services.NewSSLService()
 
 	// Load any existing data
-	if err := storageService.LoadFromFiles(); err != nil {
-		fmt.Printf("Warning: Could not load existing data: %v\n", err)
-	}
+	// if err := storageService.LoadFromFiles(); err != nil {
+	// 	fmt.Printf("Warning: Could not load existing data: %v\n", err)
+	// }
 
 	// Create a test website if none exist
 	websites := storageService.GetWebsites()
@@ -62,7 +63,7 @@ func main() {
 	// Create a new cron scheduler
 	c := cron.New()
 
-	// Function to check all websites
+	// Function to check all websites (uptime/latency)
 	checkAllWebsites := func() {
 		websites := storageService.GetWebsites()
 		fmt.Printf("Checking %d websites...\n", len(websites))
@@ -86,11 +87,37 @@ func main() {
 		fmt.Println("Next check in 60 seconds...")
 	}
 
-	// Run an initial check
+	// Run an initial uptime check on start
 	checkAllWebsites()
 
-	// Schedule regular checks every minute
+	// Run SSL checks one time at startup
+	go func() {
+		websites := storageService.GetWebsites()
+		for _, w := range websites {
+			info, err := sslService.Check(w.URL)
+			if err != nil || info == nil {
+				continue
+			}
+			info.WebsiteID = w.ID
+			_ = storageService.SaveSSL(*info)
+		}
+	}()
+
+	// Schedule regular uptime checks every minute
 	c.AddFunc("@every 1m", checkAllWebsites)
+
+	// Schedule daily SSL checks (once a day is enough)
+	c.AddFunc("@daily", func() {
+		websites := storageService.GetWebsites()
+		for _, w := range websites {
+			info, err := sslService.Check(w.URL)
+			if err != nil || info == nil {
+				continue
+			}
+			info.WebsiteID = w.ID
+			_ = storageService.SaveSSL(*info) // upsert latest SSL info
+		}
+	})
 
 	// Start the cron scheduler
 	c.Start()
@@ -101,7 +128,8 @@ func main() {
 	// Add CORS middleware
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
-		AllowMethods: "GET,POST,PUT,DELETE",
+		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
+		AllowHeaders: "*",
 	}))
 
 	// Define API routes
@@ -126,6 +154,63 @@ func main() {
 		}
 
 		return c.Status(404).JSON(fiber.Map{"error": "Website not found"})
+	})
+
+	// Get SSL info for a website (cached; computes on first request)
+	app.Get("/api/websites/:id/ssl", func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		// find website
+		var site *models.Website
+		for _, w := range storageService.GetWebsites() {
+			if w.ID == id {
+				site = &w
+				break
+			}
+		}
+		if site == nil {
+			return c.Status(404).JSON(fiber.Map{"error": "Website not found"})
+		}
+
+		// Try cached
+		if cached := storageService.GetSSL(id); cached != nil {
+			return c.JSON(cached)
+		}
+
+		// Compute now and store
+		info, err := sslService.Check(site.URL)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		info.WebsiteID = id
+		_ = storageService.SaveSSL(*info)
+		return c.JSON(info)
+	})
+
+	// Get SSL summary (earliest expiry)
+	app.Get("/api/ssl/summary", func(c *fiber.Ctx) error {
+		sites := storageService.GetWebsites()
+		var soonest *models.SSLInfo
+		var soonestSite *models.Website
+
+		for _, site := range sites {
+			if ssl := storageService.GetSSL(site.ID); ssl != nil {
+				if soonest == nil || ssl.ValidTo < soonest.ValidTo {
+					soonest = ssl
+					soonestSite = &site
+				}
+			}
+		}
+
+		if soonest == nil || soonestSite == nil {
+			return c.JSON(fiber.Map{"message": "No SSL data available"})
+		}
+
+		return c.JSON(fiber.Map{
+			"website_id": soonestSite.ID,
+			"name":       soonestSite.Name, // ✅ just the string, not the whole struct
+			"valid_to":   soonest.ValidTo,
+			"days_left":  int(time.Until(time.Unix(soonest.ValidTo, 0)).Hours() / 24),
+		})
 	})
 
 	// Get status history for a website
@@ -169,6 +254,14 @@ func main() {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to save website"})
 		}
 
+		// Kick an immediate SSL check (non-blocking) and upsert result
+		go func(w models.Website) {
+			if info, err := sslService.Check(w.URL); err == nil && info != nil {
+				info.WebsiteID = w.ID
+				_ = storageService.SaveSSL(*info)
+			}
+		}(website)
+
 		return c.Status(201).JSON(website)
 	})
 
@@ -182,7 +275,6 @@ func main() {
 	})
 
 	// Start the API server in a separate goroutine
-
 	go func() {
 		port := os.Getenv("PORT")
 		if port == "" {

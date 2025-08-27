@@ -231,7 +231,7 @@ function App() {
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8 flex justify-between items-center sticky top-0 z-20 backdrop-blur-md bg-opacity-80">
           <div>
-            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Website Monitor Dashboard</h1>
+            <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>PulseWatch</h1>
             <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Monitor your websites in real-time</p>
           </div>
           <div className="flex space-x-4 items-center">
