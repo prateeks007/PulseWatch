@@ -1,175 +1,112 @@
-import React, { useEffect, useRef, useContext } from 'react';
-import { Chart, registerables } from 'chart.js';
-import { ThemeContext } from '../context/ThemeContext';
+import React, { useMemo, useContext } from "react";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
+import { ThemeContext } from "../context/ThemeContext";
 
-Chart.register(...registerables);
-
-function StatusChart({ statuses }) {
-  const chartRef = useRef(null);
-  const chartInstance = useRef(null);
+// Accept a prop rangeHours (0.5, 3, 24). Default 3h.
+export default function StatusChart({ statuses, rangeHours = 3 }) {
   const { darkMode } = useContext(ThemeContext);
 
-  useEffect(() => {
-    // Cleanup function to destroy the chart instance when the component unmounts
-    return () => {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-        chartInstance.current = null;
-      }
-    };
-  }, []);
+  const data = useMemo(() => {
+    if (!Array.isArray(statuses) || statuses.length === 0) return [];
+    const sorted = [...statuses].sort((a, b) => a.checked_at - b.checked_at);
 
-  useEffect(() => {
-    // Exit early if there's no data or the canvas is not available
-    if (!statuses || statuses.length === 0 || !chartRef.current) {
-      if (chartInstance.current) {
-        chartInstance.current.destroy();
-        chartInstance.current = null;
-      }
-      return;
-    }
+    const cutoffMs = Date.now() - rangeHours * 60 * 60 * 1000;
+    let recent = sorted.filter((s) => s.checked_at * 1000 >= cutoffMs);
+    if (recent.length === 0) recent = sorted.slice(-100);
 
-    const sortedStatuses = [...statuses].sort((a, b) => a.checked_at - b.checked_at);
-    const labels = sortedStatuses.map(status => {
-      const date = new Date(status.checked_at * 1000);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    });
-    const responseTimeData = sortedStatuses.map(status =>
-      status.is_up ? status.response_time_ms : null
+    return recent.map((s) => ({
+      ts: s.checked_at * 1000,
+      response: s.is_up ? s.response_time_ms : null,
+      code: s.status_code ?? "N/A",
+      is_up: !!s.is_up,
+    }));
+  }, [statuses, rangeHours]);
+
+  const gridColor = darkMode ? "rgba(0,0,0,0.18)" : "rgba(0,0,0,0.06)"; // subtle difference
+  const tickColor = darkMode ? "#E5E7EB" : "#374151";
+  const lineColor = darkMode ? "#60A5FA" : "#2563EB";
+
+  if (!data.length) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <p className={darkMode ? "text-gray-400" : "text-gray-500"}>
+          No data available
+        </p>
+      </div>
     );
+  }
 
-    const ctx = chartRef.current.getContext('2d');
-    
-    // Create a gradient for the chart area fill
-    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    const primaryColor = darkMode ? 'rgba(59, 130, 246, 1)' : 'rgba(37, 99, 235, 1)';
-    const transparentPrimary = darkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(37, 99, 235, 0.1)';
-    
-    gradient.addColorStop(0, primaryColor);
-    gradient.addColorStop(1, transparentPrimary);
-
-    if (chartInstance.current) {
-      // If the chart already exists, just update the data and styling
-      chartInstance.current.data.labels = labels;
-      chartInstance.current.data.datasets[0].data = responseTimeData;
-      chartInstance.current.data.datasets[0].backgroundColor = gradient;
-      chartInstance.current.data.datasets[0].borderColor = primaryColor;
-      
-      // Update scales for theme changes
-      chartInstance.current.options.scales.x.grid.color = darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-      chartInstance.current.options.scales.x.ticks.color = darkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)';
-      chartInstance.current.options.scales.y.grid.color = darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-      chartInstance.current.options.scales.y.ticks.color = darkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)';
-
-      chartInstance.current.update();
-    } else {
-      // Create a new chart instance
-      chartInstance.current = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: 'Response Time (ms)',
-              data: responseTimeData,
-              fill: true,
-              backgroundColor: gradient,
-              borderColor: primaryColor,
-              borderWidth: 2,
-              tension: 0.4, // Makes the line smooth
-              pointRadius: 3,
-              pointHoverRadius: 6,
-              pointBackgroundColor: 'white',
-              pointBorderColor: primaryColor,
-              pointBorderWidth: 2,
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: {
-            duration: 1000
-          },
-          scales: {
-            x: {
-              grid: {
-                color: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                drawBorder: false,
-              },
-              ticks: {
-                color: darkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
-                maxRotation: 0,
-                minRotation: 0,
-                font: { size: 10 }
-              }
-            },
-            y: {
-              beginAtZero: true,
-              grid: {
-                color: darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                drawBorder: false,
-              },
-              ticks: {
-                color: darkMode ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
-                font: { size: 10 }
-              }
-            }
-          },
-          plugins: {
-            legend: {
-              display: false,
-            },
-            tooltip: {
-              backgroundColor: darkMode ? 'rgba(40, 40, 40, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-              titleColor: darkMode ? '#ffffff' : '#000000',
-              bodyColor: darkMode ? '#e2e8f0' : '#475569',
-              borderColor: darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-              borderWidth: 1,
-              cornerRadius: 8,
-              titleFont: { weight: 'bold' },
-              callbacks: {
-                title: function(context) {
-                  const date = new Date(sortedStatuses[context[0].dataIndex].checked_at * 1000);
-                  return date.toLocaleString();
-                },
-                label: function(context) {
-                  const status = sortedStatuses[context.dataIndex];
-                  const lines = [];
-                  lines.push(`Status: ${status.is_up ? 'Online' : 'Offline'}`);
-                  if (status.is_up) {
-                    lines.push(`Response Time: ${status.response_time_ms} ms`);
-                  }
-                  lines.push(`Status Code: ${status.status_code || 'N/A'}`);
-                  return lines;
-                },
-                labelColor: function() {
-                  return {
-                    borderColor: primaryColor,
-                    backgroundColor: primaryColor
-                  };
-                }
-              }
-            },
-          },
-        },
-      });
-    }
-  }, [statuses, darkMode]);
+  const cardCls = [
+    "rounded-2xl p-3 h-80",
+    darkMode ? "bg-gray-800/60" : "bg-white"
+  ].join(" ");
 
   return (
-    <div className="h-80">
-      {statuses && statuses.length > 0 ? (
-        <canvas ref={chartRef}></canvas>
-      ) : (
-        <div className="flex items-center justify-center h-full">
-          <p className={`text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            No data available
-          </p>
-        </div>
-      )}
+    <div className={cardCls}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+          <defs>
+            <linearGradient id="respGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={lineColor} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={lineColor} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+
+          <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+
+          <XAxis
+            dataKey="ts"
+            minTickGap={40}
+            tick={{ fill: tickColor, fontSize: 12 }}
+            tickFormatter={(t) =>
+              new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            }
+            interval="preserveStartEnd"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            scale="time"
+          />
+
+          <YAxis
+            tick={{ fill: tickColor, fontSize: 12 }}
+            stroke={gridColor}
+            domain={[0, "auto"]}
+            allowDecimals={false}
+          />
+
+          <Tooltip
+            contentStyle={{
+              backgroundColor: darkMode ? "#111827" : "#ffffff",
+              border: "none",
+              borderRadius: 8,
+              color: darkMode ? "#e5e7eb" : "#111827",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+            }}
+            labelFormatter={(ts) => new Date(ts).toLocaleString()}
+            formatter={(value) => (value == null ? ["Offline", "Status"] : [`${value} ms`, "Response"])}
+          />
+
+          <Line
+            type="monotone"
+            dataKey="response"
+            stroke={lineColor}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+            connectNulls={false}
+            fillOpacity={1}
+            fill="url(#respGradient)"
+          />
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   );
 }
-
-export default StatusChart;

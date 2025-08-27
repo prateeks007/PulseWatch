@@ -5,32 +5,36 @@ import WebsiteList from './components/WebsiteList';
 import ThemeToggle from './components/ThemeToggle';
 import FilterBar from './components/FilterBar';
 import SummaryDashboard from './components/SummaryDashboard';
-import WebsiteDetailsCard from './components/WebsiteDetailsCard'; // <-- NEW IMPORT
+import WebsiteDetailsCard from './components/WebsiteDetailsCard';
+import AddWebsiteModal from './components/AddWebsiteModal';
+import DeleteConfirmModal from './components/DeleteConfirmModal';
 import { ThemeContext } from './context/ThemeContext';
+import { useToast } from './components/ToastProvider';
 import { debounce } from 'lodash';
 
 function App() {
   const { darkMode } = useContext(ThemeContext);
+  const { addToast } = useToast();
+
   const [websites, setWebsites] = useState([]);
   const [selectedWebsite, setSelectedWebsite] = useState(null);
   const [statuses, setStatuses] = useState([]);
+  const [latestStatusesAllSites, setLatestStatusesAllSites] = useState([]);
+  const [statusesByWebsite, setStatusesByWebsite] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({
-    status: 'all',
-    maxResponseTime: null
-  });
+  const [filters, setFilters] = useState({ status: 'all', maxResponseTime: null });
   const [showSummary, setShowSummary] = useState(true);
+  const [rangeHours, setRangeHours] = useState(3);
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-// console.log("Base URL:", import.meta.env.VITE_API_BASE_URL);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [websiteToDelete, setWebsiteToDelete] = useState(null);
 
-
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
   const debouncedSetFilters = useCallback(
-    debounce((newFilters) => {
-      setFilters(newFilters);
-    }, 300),
+    debounce((newFilters) => setFilters(newFilters), 300),
     []
   );
 
@@ -38,33 +42,45 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
     debouncedSetFilters(newFilters);
   }, [debouncedSetFilters]);
 
-  // Keep your original fetching logic
+  // Fetch websites and statuses
   const fetchWebsites = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/websites`);
-      // console.log("API response:", response.data);
 
-      
+      const latestStatuses = [];
+      const nextStatusesByWebsite = {};
+
       const websitesWithStatus = await Promise.all(
         response.data.map(async (website) => {
           try {
             const statusResponse = await axios.get(`${API_BASE_URL}/api/websites/${website.id}/status`);
-            
+
             if (statusResponse.data && statusResponse.data.length > 0) {
+              const latest = statusResponse.data[0];
+              latestStatuses.push(latest);
+              const slice = statusResponse.data.slice(0, 120);
+              nextStatusesByWebsite[website.id] = slice;
+
               return {
                 ...website,
-                lastStatus: statusResponse.data[0].is_up
+                lastStatus: latest.is_up,
+                last10Statuses: slice.slice(0, 10),
               };
             }
+
+            nextStatusesByWebsite[website.id] = [];
             return website;
           } catch (err) {
             console.error(`Failed to fetch status for website ${website.id}:`, err);
+            nextStatusesByWebsite[website.id] = [];
             return website;
           }
         })
       );
-      
+
       setWebsites(websitesWithStatus);
+      setStatusesByWebsite(nextStatusesByWebsite);
+      setLatestStatusesAllSites(latestStatuses);
       setLoading(false);
 
       if (!selectedWebsite && websitesWithStatus.length > 0) {
@@ -112,15 +128,15 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
       return websites;
     }
 
-    return websites.filter(website => {
+    return websites.filter((website) => {
       if (filters.status !== 'all') {
         if (filters.status === 'online' && website.lastStatus !== true) return false;
         if (filters.status === 'offline' && website.lastStatus !== false) return false;
         if (filters.status === 'unknown' && (website.lastStatus === true || website.lastStatus === false)) return false;
       }
-      
+
       if (filters.maxResponseTime && filters.maxResponseTime > 0 && statuses.length > 0) {
-        const relevantStatus = statuses.find(status => status.website_id === website.id);
+        const relevantStatus = statuses.find((status) => status.website_id === website.id);
         if (relevantStatus && relevantStatus.response_time_ms > filters.maxResponseTime) {
           return false;
         }
@@ -134,23 +150,18 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
     if (filteredWebsites.length === 0) {
       setSelectedWebsite(null);
       setStatuses([]);
-    }
-    else if (selectedWebsite && !filteredWebsites.some(w => w.id === selectedWebsite.id)) {
+    } else if (selectedWebsite && !filteredWebsites.some((w) => w.id === selectedWebsite.id)) {
       setSelectedWebsite(filteredWebsites[0]);
       fetchStatuses(filteredWebsites[0].id);
-    }
-    else if (!selectedWebsite && filteredWebsites.length > 0) {
+    } else if (!selectedWebsite && filteredWebsites.length > 0) {
       setSelectedWebsite(filteredWebsites[0]);
       fetchStatuses(filteredWebsites[0].id);
-    }
-    else if (selectedWebsite && statuses.length === 0) {
+    } else if (selectedWebsite && statuses.length === 0) {
       fetchStatuses(selectedWebsite.id);
     }
   }, [filteredWebsites, selectedWebsite, statuses.length]);
 
-  const toggleSummary = () => {
-    setShowSummary(!showSummary);
-  };
+  const toggleSummary = () => setShowSummary(!showSummary);
 
   if (loading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
@@ -161,9 +172,15 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
   }
 
   return (
-    <div className={`min-h-screen bg-gradient-to-b ${darkMode ? 'from-gray-900 to-gray-800' : 'from-gray-50 to-gray-100'} transition-colors duration-200`}>
+    <div
+      className={`min-h-screen transition-colors duration-200 ${
+        darkMode
+          ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 animate-gradient-x'
+          : 'bg-gradient-to-br from-blue-50 via-white to-blue-100 animate-gradient-x'
+      }`}
+    >
       <div className="container mx-auto px-4 py-8">
-        <header className="mb-8 flex justify-between items-center">
+        <header className="mb-8 flex justify-between items-center sticky top-0 z-20 backdrop-blur-md bg-opacity-80">
           <div>
             <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Website Monitor Dashboard</h1>
             <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Monitor your websites in real-time</p>
@@ -171,8 +188,16 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
           <div className="flex space-x-4 items-center">
             <button
               className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                darkMode 
-                  ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                darkMode ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
+              onClick={() => setShowAddModal(true)}
+            >
+              + Add Website
+            </button>
+            <button
+              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                darkMode
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
                   : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-200'
               }`}
               onClick={toggleSummary}
@@ -184,31 +209,81 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
         </header>
 
         {showSummary && (
-          <SummaryDashboard websites={websites} statuses={statuses} />
+          <SummaryDashboard
+            websites={websites}
+            statuses={latestStatusesAllSites}
+            statusesByWebsite={statusesByWebsite}
+            rangeHours={rangeHours}
+          />
         )}
 
         <FilterBar filters={filters} setFilters={handleFilterChange} />
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="md:col-span-1">
-            <WebsiteList 
+            <WebsiteList
               websites={filteredWebsites}
               selectedWebsite={selectedWebsite}
               onSelect={handleWebsiteSelect}
+              onDelete={(w) => {
+                setWebsiteToDelete(w);
+                setShowDeleteModal(true);
+              }}
             />
           </div>
 
           <div className="md:col-span-3">
             {selectedWebsite && filteredWebsites.length > 0 ? (
-              <WebsiteDetailsCard website={selectedWebsite} statuses={statuses} /> // <-- USE NEW COMPONENT
+              <WebsiteDetailsCard
+                website={selectedWebsite}
+                statuses={statuses}
+                rangeHours={rangeHours}
+                onChangeRangeHours={setRangeHours}
+              />
             ) : (
-              <div className={`${darkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-500'} rounded-lg shadow p-6 flex justify-center items-center h-64`}>
-                <p>{filteredWebsites.length === 0 ? 'No websites match your filters' : 'Select a website to view details'}</p>
+              <div
+                className={`${
+                  darkMode ? 'bg-gray-800 text-gray-300' : 'bg-white text-gray-500'
+                } rounded-lg shadow p-6 flex justify-center items-center h-64`}
+              >
+                <p>
+                  {filteredWebsites.length === 0
+                    ? 'No websites match your filters'
+                    : 'Select a website to view details'}
+                </p>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Add Website */}
+      <AddWebsiteModal
+        open={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSubmit={(data) => {
+          console.log("Form submitted:", data);
+          addToast("Website added ✅", "success");
+          setShowAddModal(false);
+        }}
+      />
+
+      {/* Delete Website */}
+      <DeleteConfirmModal
+        open={showDeleteModal}
+        website={websiteToDelete}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setWebsiteToDelete(null);
+        }}
+        onConfirm={(w) => {
+          console.log("Delete confirmed:", w);
+          setWebsites((prev) => prev.filter((site) => site.id !== w.id));
+          addToast("Website deleted ❌", "error");
+          setShowDeleteModal(false);
+          setWebsiteToDelete(null);
+        }}
+      />
     </div>
   );
 }

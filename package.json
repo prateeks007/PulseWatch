@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "dayjs": "^1.11.14",
+    "recharts": "^3.1.2"
+  }
+}
