@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -42,6 +43,9 @@ func (s *MonitorService) CheckWebsite(website models.Website) (models.WebsiteSta
 	// If there was an error, the site is down
 	if err != nil {
 		status.IsUp = false
+		status.StatusCode = 0
+		// 👇 log for debug
+		fmt.Printf("[DEBUG] %s failed, respTime=%dms\n", website.URL, responseTime)
 		return status, err
 	}
 	defer resp.Body.Close() // Always close the response
@@ -51,6 +55,8 @@ func (s *MonitorService) CheckWebsite(website models.Website) (models.WebsiteSta
 
 	// Site is "up" if status code is 200-399
 	status.IsUp = resp.StatusCode >= 200 && resp.StatusCode < 400
+
+	fmt.Printf("[DEBUG] %s OK %dms\n", website.URL, status.ResponseTime)
 
 	return status, nil
 }

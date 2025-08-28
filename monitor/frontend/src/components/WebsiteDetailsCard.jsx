@@ -1,89 +1,139 @@
 // src/components/WebsiteDetailsCard.jsx
-import React, { useContext } from 'react';
-import { ThemeContext } from '../context/ThemeContext';
-import StatusChart from './StatusChart';
-import { Clock, TrendingUp, TrendingDown } from 'lucide-react';
+import React, { useContext, useMemo } from "react";
+import { ThemeContext } from "../context/ThemeContext";
+import TimeRangeToggle from "./TimeRangeToggle";
+import StatusChart from "./StatusChart";
+import SSLCard from "./SSLCard";
 
-function WebsiteDetailsCard({ website, statuses }) {
+export default function WebsiteDetailsCard({
+  website,
+  statuses,
+  rangeHours = 3,
+  onChangeRangeHours,
+}) {
   const { darkMode } = useContext(ThemeContext);
 
-  const latestStatus = statuses.length > 0 ? statuses[0] : null;
-  
-  const responseTimes = statuses.filter(s => s.is_up).map(s => s.response_time_ms);
-  
-  const minResponseTime = responseTimes.length > 0 ? Math.min(...responseTimes) : null;
-  const maxResponseTime = responseTimes.length > 0 ? Math.max(...responseTimes) : null;
-  const latestResponseTime = latestStatus && latestStatus.is_up ? latestStatus.response_time_ms : null;
+  const safeStatuses = Array.isArray(statuses) ? statuses.filter(Boolean) : [];
+
+  const latest = useMemo(() => {
+    if (!safeStatuses.length) return null;
+    return safeStatuses.reduce((a, b) =>
+      (a?.checked_at ?? -Infinity) > (b?.checked_at ?? -Infinity) ? a : b
+    );
+  }, [safeStatuses]);
+
+  const onlineWithMs = useMemo(() => {
+    return safeStatuses.filter(
+      (s) => s?.is_up && typeof s?.response_time_ms === "number"
+    );
+  }, [safeStatuses]);
+
+  const fastest = useMemo(() => {
+    if (!onlineWithMs.length) return null;
+    return onlineWithMs.reduce((a, b) =>
+      a.response_time_ms < b.response_time_ms ? a : b
+    );
+  }, [onlineWithMs]);
+
+  const slowest = useMemo(() => {
+    if (!onlineWithMs.length) return null;
+    return onlineWithMs.reduce((a, b) =>
+      a.response_time_ms > b.response_time_ms ? a : b
+    );
+  }, [onlineWithMs]);
+
+  const isOnline = latest?.is_up;
+
+  const cardCls = [
+    "rounded-2xl p-5 shadow-xl ring-1",
+    darkMode ? "bg-gray-900/70 ring-black/5" : "bg-white ring-black/10",
+  ].join(" ");
+
+  const titleCls = darkMode
+    ? "text-2xl font-semibold text-white"
+    : "text-2xl font-semibold text-gray-900";
+  const subtitleCls = darkMode
+    ? "text-sm text-gray-400"
+    : "text-sm text-gray-500";
+
+  const statWrapCls = darkMode
+    ? "bg-gray-800/70 rounded-xl p-4"
+    : "bg-gray-50 rounded-xl p-4";
+
+  const statLabelCls = darkMode
+    ? "text-xs text-gray-400 mb-1"
+    : "text-xs text-gray-500 mb-1";
+
+  const statValueCls = darkMode
+    ? "text-2xl font-semibold text-white"
+    : "text-2xl font-semibold text-gray-900";
 
   return (
-    <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-xl p-6 transition-colors duration-200`}>
-      {/* Header section with website name and URL */}
-      <div className="flex justify-between items-start mb-4">
+    <div className={cardCls}>
+      <div className="flex items-center justify-between mb-2">
         <div>
-          <h2 className="text-2xl font-bold">
-            {website.name}
-          </h2>
-          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            ({website.url})
-          </p>
+          <h2 className={titleCls}>{website?.name}</h2>
+          <p className={subtitleCls}>{website?.url}</p>
         </div>
-        {latestStatus && (
-          <div className="flex items-center space-x-2">
-            <span className={`h-3 w-3 rounded-full ${
-              latestStatus.is_up ? 'bg-green-500' : 'bg-red-500'
-            }`}></span>
-            <p className={`font-medium text-lg ${latestStatus.is_up ? 'text-green-500' : 'text-red-500'}`}>
-              {latestStatus.is_up ? 'Online' : 'Offline'}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* A small dashboard above the chart for key metrics */}
-      <div className={`grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-center`}>
-        <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-          <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-            <Clock size={16} />
-            <span>Latest</span>
-          </div>
-          <p className="text-xl font-bold mt-1">
-            {latestResponseTime ? `${latestResponseTime} ms` : 'N/A'}
-          </p>
-        </div>
-        <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-          <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-            <TrendingDown size={16} />
-            <span>Fastest</span>
-          </div>
-          <p className="text-xl font-bold mt-1">
-            {minResponseTime ? `${minResponseTime} ms` : 'N/A'}
-          </p>
-        </div>
-        <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-          <div className="flex items-center justify-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-            <TrendingUp size={16} />
-            <span>Slowest</span>
-          </div>
-          <p className="text-xl font-bold mt-1">
-            {maxResponseTime ? `${maxResponseTime} ms` : 'N/A'}
-          </p>
+        <div className="flex items-center gap-3">
+          <span
+            className={`inline-flex items-center gap-2 text-sm ${
+              isOnline ? "text-emerald-500" : "text-rose-500"
+            }`}
+          >
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${
+                isOnline ? "bg-emerald-400" : "bg-rose-400"
+              }`}
+            />
+            {isOnline ? "Online" : "Offline"}
+          </span>
+          <TimeRangeToggle
+            valueHours={rangeHours}
+            onChange={onChangeRangeHours}
+          />
         </div>
       </div>
 
-      <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+      {/* stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-4">
+        <div className={statWrapCls}>
+          <div className={statLabelCls}>Latest</div>
+          <div className={statValueCls}>
+            {latest?.is_up && typeof latest?.response_time_ms === "number"
+              ? `${latest.response_time_ms} ms`
+              : "—"}
+          </div>
+        </div>
+
+        <div className={statWrapCls}>
+          <div className={statLabelCls}>Fastest</div>
+          <div className={statValueCls}>
+            {fastest ? `${fastest.response_time_ms} ms` : "—"}
+          </div>
+        </div>
+
+        <div className={statWrapCls}>
+          <div className={statLabelCls}>Slowest</div>
+          <div className={statValueCls}>
+            {slowest ? `${slowest.response_time_ms} ms` : "—"}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={
+          darkMode
+            ? "text-white font-semibold mb-2"
+            : "text-gray-900 font-semibold mb-2"
+        }
+      >
         Response Time History
-      </h3>
-      {statuses.length > 0 ? (
-        <StatusChart statuses={statuses} />
-      ) : (
-        <div className="flex items-center justify-center h-64">
-          <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            No history available for this website.
-          </p>
-        </div>
-      )}
+      </div>
+      <StatusChart statuses={safeStatuses} rangeHours={rangeHours} />
+      <div className="mt-4">
+        <SSLCard website={website} />
+      </div>
     </div>
   );
 }
-
-export default WebsiteDetailsCard;

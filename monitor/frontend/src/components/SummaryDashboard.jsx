@@ -1,123 +1,331 @@
-import React, { useContext } from 'react';
-import { ThemeContext } from '../context/ThemeContext';
-// --- NEW IMPORTS: Lucide React Icons ---
-import { Globe, CheckCircle, XCircle, Clock, Zap } from 'lucide-react';
-// --- END NEW IMPORTS ---
+import React, { useContext, useMemo, useEffect, useState } from "react";
+import { ThemeContext } from "../context/ThemeContext";
+import { Globe, CheckCircle, Clock, Zap, Shield } from "lucide-react";
+import axios from "axios";
 
-function SummaryDashboard({ websites, statuses }) {
+function SummaryDashboard({
+  websites,
+  statuses,
+  statusesByWebsite = {},
+  rangeHours = 3,
+}) {
   const { darkMode } = useContext(ThemeContext);
+  const [sslSummary, setSslSummary] = useState(null);
 
-  // Calculate summary statistics
+  useEffect(() => {
+    axios
+      .get("http://localhost:3000/api/ssl/summary")
+      .then((res) => setSslSummary(res.data))
+      .catch(() => setSslSummary(null));
+  }, [websites]);
+
   const totalWebsites = websites.length;
-  const onlineWebsites = websites.filter(website => website.lastStatus === true).length;
-  const offlineWebsites = websites.filter(website => website.lastStatus === false).length;
-  const unknownWebsites = websites.filter(website => website.lastStatus !== true && website.lastStatus !== false).length;
-  
-  // Calculate average response time from the most recent status for each website
-  let totalResponseTime = 0;
-  let websitesWithResponseTime = 0;
-  
-  // To calculate average and slowest, we need the *latest* status for each website.
-  // This logic assumes `websites` prop already contains `lastStatus` correctly from App.jsx
-  // If `statuses` prop is meant to be *all* statuses, this needs adjustment.
-  // For now, relying on `website.lastStatus` for online/offline and finding latest for response time.
-  const latestStatusesMap = new Map();
-  statuses.forEach(status => {
-    if (!latestStatusesMap.has(status.website_id) || status.checked_at > latestStatusesMap.get(status.website_id).checked_at) {
-      latestStatusesMap.set(status.website_id, status);
-    }
-  });
+  const onlineWebsites = websites.filter((w) => w.lastStatus === true).length;
+  const offlineWebsites = websites.filter((w) => w.lastStatus === false).length;
+  const unknownWebsites = websites.filter(
+    (w) => w.lastStatus !== true && w.lastStatus !== false
+  ).length; // ✅ FIX: use .length
 
+  const latestStatusesMap = useMemo(() => {
+    const map = new Map();
+    (statuses || []).forEach((status) => {
+      const prev = map.get(status.website_id);
+      if (!prev || status.checked_at > prev.checked_at) {
+        map.set(status.website_id, status);
+      }
+    });
+    return map;
+  }, [statuses]);
 
-  websites.forEach(website => {
-    const latestStatusForWebsite = latestStatusesMap.get(website.id);
-    if (latestStatusForWebsite && latestStatusForWebsite.is_up && latestStatusForWebsite.response_time_ms) {
-      totalResponseTime += latestStatusForWebsite.response_time_ms;
-      websitesWithResponseTime++;
-    }
-  });
-  
-  const avgResponseTime = websitesWithResponseTime > 0 
-    ? Math.round(totalResponseTime / websitesWithResponseTime) 
-    : 0;
+  const cutoff = useMemo(
+    () => Date.now() - rangeHours * 60 * 60 * 1000,
+    [rangeHours]
+  );
 
-  // Find the slowest website
-  let slowestWebsite = null;
-  let slowestResponseTime = 0;
-  
-  websites.forEach(website => {
-    const latestStatusForWebsite = latestStatusesMap.get(website.id);
-    if (latestStatusForWebsite && latestStatusForWebsite.is_up && latestStatusForWebsite.response_time_ms > slowestResponseTime) {
-      slowestResponseTime = latestStatusForWebsite.response_time_ms;
-      slowestWebsite = website;
-    }
-  });
+  const {
+    avgResponseTime,
+    slowestWebsiteName,
+    slowestResponseTime,
+  } = useMemo(() => {
+    let totalMs = 0;
+    let count = 0;
+    let slowestMs = 0;
+    let slowestName = null;
+
+    websites.forEach((w) => {
+      const arr = Array.isArray(statusesByWebsite[w.id])
+        ? statusesByWebsite[w.id]
+        : [];
+
+      const inWindow = arr.filter(
+        (s) =>
+          typeof s?.checked_at === "number" &&
+          s.checked_at * 1000 >= cutoff &&
+          s?.is_up &&
+          typeof s?.response_time_ms === "number"
+      );
+
+      if (inWindow.length > 0) {
+        const latestInWindow = inWindow.reduce((a, b) =>
+          a.checked_at > b.checked_at ? a : b
+        );
+        totalMs += latestInWindow.response_time_ms;
+        count += 1;
+
+        const localSlowest = inWindow.reduce((a, b) =>
+          a.response_time_ms > b.response_time_ms ? a : b
+        );
+        if (localSlowest.response_time_ms > slowestMs) {
+          slowestMs = localSlowest.response_time_ms;
+          slowestName = w.name; // store string only
+        }
+      } else {
+        const latest = latestStatusesMap.get(w.id);
+        if (latest?.is_up && typeof latest?.response_time_ms === "number") {
+          totalMs += latest.response_time_ms;
+          count += 1;
+
+          if (latest.response_time_ms > slowestMs) {
+            slowestMs = latest.response_time_ms;
+            slowestName = w.name; // store string only
+          }
+        }
+      }
+    });
+
+    return {
+      avgResponseTime: count > 0 ? Math.round(totalMs / count) : 0,
+      slowestWebsiteName: slowestName,
+      slowestResponseTime: slowestMs,
+    };
+  }, [websites, statusesByWebsite, latestStatusesMap, cutoff]);
 
   return (
-    <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'} rounded-lg shadow-xl p-6 mb-6 transition-colors duration-200`}>
-      <h2 className="text-2xl font-bold mb-6 text-center">System Overview</h2> {/* Larger, centered title */}
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"> {/* Increased gap */}
-        {/* Total Websites Card */}
-        <div className={`p-5 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-blue-50 border-blue-100'} transition-colors duration-200`}>
+    <div
+      className={`${
+        darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"
+      } rounded-lg shadow-xl p-6 mb-6`}
+    >
+      <h2 className="text-2xl font-bold mb-6 text-center">System Overview</h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        {/* Total Websites */}
+        <div
+          className={`p-5 rounded-xl border ${
+            darkMode
+              ? "bg-gray-700 border-gray-600"
+              : "bg-blue-50 border-blue-100"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Total Websites</p>
-              <p className="text-3xl font-extrabold mt-1">{totalWebsites}</p> {/* Larger, bolder number */}
+              <p
+                className={`text-sm font-medium ${
+                  darkMode ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
+                Total Websites
+              </p>
+              <p className="text-3xl font-extrabold mt-1">{totalWebsites}</p>
             </div>
-            <div className={`p-3 rounded-full ${darkMode ? 'bg-gray-600' : 'bg-blue-100'}`}>
-              <Globe className={`h-7 w-7 ${darkMode ? 'text-blue-400' : 'text-blue-500'}`} /> {/* Lucide Icon */}
+            <div
+              className={`p-3 rounded-full ${
+                darkMode ? "bg-gray-600" : "bg-blue-100"
+              }`}
+            >
+              <Globe
+                className={`h-7 w-7 ${
+                  darkMode ? "text-blue-400" : "text-blue-500"
+                }`}
+              />
             </div>
           </div>
         </div>
-        
-        {/* Online vs Offline Card */}
-        <div className={`p-5 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-green-50 border-green-100'} transition-colors duration-200`}>
+
+        {/* Online vs Offline */}
+        <div
+          className={`p-5 rounded-xl border ${
+            darkMode
+              ? "bg-gray-700 border-gray-600"
+              : "bg-green-50 border-green-100"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Online</p>
-              <p className="text-3xl font-extrabold mt-1 text-green-500">{onlineWebsites} <span className="text-lg font-normal">of {totalWebsites}</span></p>
+              <p
+                className={`text-sm font-medium ${
+                  darkMode ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
+                Online
+              </p>
+              <p className="text-3xl font-extrabold mt-1 text-green-500">
+                {onlineWebsites}{" "}
+                <span className="text-lg font-normal">of {totalWebsites}</span>
+              </p>
             </div>
-            <div className={`p-3 rounded-full ${darkMode ? 'bg-gray-600' : 'bg-green-100'}`}>
-              <CheckCircle className={`h-7 w-7 ${darkMode ? 'text-green-400' : 'text-green-500'}`} /> {/* Lucide Icon */}
+            <div
+              className={`p-3 rounded-full ${
+                darkMode ? "bg-gray-600" : "bg-green-100"
+              }`}
+            >
+              <CheckCircle
+                className={`h-7 w-7 ${
+                  darkMode ? "text-green-400" : "text-green-500"
+                }`}
+              />
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between text-sm">
-            <span className={`${darkMode ? 'text-red-400' : 'text-red-500'} font-medium`}>Offline: {offlineWebsites}</span>
-            <span className={`${darkMode ? 'text-yellow-400' : 'text-yellow-500'} font-medium`}>Unknown: {unknownWebsites}</span>
+            <span
+              className={`${
+                darkMode ? "text-red-400" : "text-red-500"
+              } font-medium`}
+            >
+              Offline: {offlineWebsites}
+            </span>
+            <span
+              className={`${
+                darkMode ? "text-yellow-400" : "text-yellow-500"
+              } font-medium`}
+            >
+              Unknown: {unknownWebsites}
+            </span>
           </div>
         </div>
-        
-        {/* Average Response Time Card */}
-        <div className={`p-5 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-purple-50 border-purple-100'} transition-colors duration-200`}>
+
+        {/* Average Response Time */}
+        <div
+          className={`p-5 rounded-xl border ${
+            darkMode
+              ? "bg-gray-700 border-gray-600"
+              : "bg-purple-50 border-purple-100"
+          }`}
+        >
           <div className="flex items-center justify-between">
             <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Avg Response Time</p>
-              <p className="text-3xl font-extrabold mt-1">{avgResponseTime}<span className="text-lg font-normal ml-1">ms</span></p>
-            </div>
-            <div className={`p-3 rounded-full ${darkMode ? 'bg-gray-600' : 'bg-purple-100'}`}>
-              <Clock className={`h-7 w-7 ${darkMode ? 'text-purple-400' : 'text-purple-500'}`} /> {/* Lucide Icon */}
-            </div>
-          </div>
-        </div>
-        
-        {/* Slowest Website Card */}
-        <div className={`p-5 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-yellow-50 border-yellow-100'} transition-colors duration-200`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Slowest Website</p>
-              <p className="text-lg font-extrabold mt-1 truncate max-w-[140px]">
-                {slowestWebsite ? slowestWebsite.name : 'N/A'}
+              <p
+                className={`text-sm font-medium ${
+                  darkMode ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
+                Avg Response Time
+              </p>
+              <p className="text-3xl font-extrabold mt-1">
+                {avgResponseTime}
+                <span className="text-lg font-normal ml-1">ms</span>
               </p>
             </div>
-            <div className={`p-3 rounded-full ${darkMode ? 'bg-gray-600' : 'bg-yellow-100'}`}>
-              <Zap className={`h-7 w-7 ${darkMode ? 'text-yellow-400' : 'text-yellow-500'}`} /> {/* Lucide Icon */}
+            <div
+              className={`p-3 rounded-full ${
+                darkMode ? "bg-gray-600" : "bg-purple-100"
+              }`}
+            >
+              <Clock
+                className={`h-7 w-7 ${
+                  darkMode ? "text-purple-400" : "text-purple-500"
+                }`}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Slowest Website */}
+        <div
+          className={`p-5 rounded-xl border ${
+            darkMode
+              ? "bg-gray-700 border-gray-600"
+              : "bg-yellow-50 border-yellow-100"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p
+                className={`text-sm font-medium ${
+                  darkMode ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
+                Slowest Website
+              </p>
+              <p className="text-lg font-extrabold mt-1 truncate max-w-[140px]">
+                {slowestWebsiteName || "N/A"}
+              </p>
+            </div>
+            <div
+              className={`p-3 rounded-full ${
+                darkMode ? "bg-gray-600" : "bg-yellow-100"
+              }`}
+            >
+              <Zap
+                className={`h-7 w-7 ${
+                  darkMode ? "text-yellow-400" : "text-yellow-500"
+                }`}
+              />
             </div>
           </div>
           <div className="mt-3 text-sm">
-            <span className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} font-medium`}>
-              {slowestResponseTime > 0 ? `${slowestResponseTime} ms` : 'No data'}
+            <span
+              className={`${
+                darkMode ? "text-gray-300" : "text-gray-600"
+              } font-medium`}
+            >
+              {slowestResponseTime > 0
+                ? `${slowestResponseTime} ms`
+                : "No data"}
             </span>
+          </div>
+        </div>
+
+        {/* SSL Summary */}
+        <div
+          className={`p-5 rounded-xl border ${
+            darkMode
+              ? "bg-gray-700 border-gray-600"
+              : "bg-indigo-50 border-indigo-100"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p
+                className={`text-sm font-medium ${
+                  darkMode ? "text-gray-300" : "text-gray-600"
+                }`}
+              >
+                Earliest SSL Expiry
+              </p>
+              <p className="text-lg font-extrabold mt-1 truncate max-w-[140px]">
+                {sslSummary?.name || "N/A"}
+              </p>
+            </div>
+            <div
+              className={`p-3 rounded-full ${
+                darkMode ? "bg-gray-600" : "bg-indigo-100"
+              }`}
+            >
+              <Shield
+                className={`h-7 w-7 ${
+                  darkMode ? "text-indigo-400" : "text-indigo-500"
+                }`}
+              />
+            </div>
+          </div>
+          <div className="mt-3 text-sm">
+            {sslSummary?.days_left !== undefined ? (
+              <span
+                className={
+                  sslSummary.days_left <= 7
+                    ? "text-red-500"
+                    : sslSummary.days_left <= 30
+                    ? "text-yellow-500"
+                    : "text-green-500"
+                }
+              >
+                {sslSummary.days_left} days left (till{" "}
+                {new Date(sslSummary.valid_to * 1000).toLocaleDateString()})
+              </span>
+            ) : (
+              <span>No data</span>
+            )}
           </div>
         </div>
       </div>

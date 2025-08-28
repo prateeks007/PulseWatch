@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "chartjs-plugin-annotation": "^3.1.0",
+    "dayjs": "^1.11.14",
+    "recharts": "^3.1.2"
+  }
+}
