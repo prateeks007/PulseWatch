@@ -9,12 +9,15 @@ function SummaryDashboard({
   statusesByWebsite = {},
   rangeHours = 3,
 }) {
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
   const { darkMode } = useContext(ThemeContext);
   const [sslSummary, setSslSummary] = useState(null);
 
   useEffect(() => {
     axios
-      .get("http://localhost:3000/api/ssl/summary")
+      .get(`${API_BASE_URL}/api/ssl/summary`)
       .then((res) => setSslSummary(res.data))
       .catch(() => setSslSummary(null));
   }, [websites]);
