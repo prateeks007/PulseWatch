@@ -25,6 +25,7 @@ function App() {
   const [statuses, setStatuses] = useState([]);
   const [latestStatusesAllSites, setLatestStatusesAllSites] = useState([]);
   const [statusesByWebsite, setStatusesByWebsite] = useState({});
+  const [previousWebsiteStatuses, setPreviousWebsiteStatuses] = useState({}); // Track previous status
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({ status: 'all', maxResponseTime: null });
@@ -89,6 +90,30 @@ function App() {
           }
         })
       );
+
+      // Check for status changes and show notifications
+      websitesWithStatus.forEach(website => {
+        const currentStatus = website.lastStatus;
+        const previousStatus = previousWebsiteStatuses[website.id];
+        
+        // Only show notification if we have a previous status and it changed
+        if (previousStatus !== undefined && previousStatus !== currentStatus) {
+          if (currentStatus === true && previousStatus === false) {
+            // Website came back online
+            addToast(`✅ ${website.name} is back online!`, 'success', 5000);
+          } else if (currentStatus === false && previousStatus === true) {
+            // Website went offline
+            addToast(`❌ ${website.name} went offline!`, 'error', 5000);
+          }
+        }
+      });
+
+      // Update previous statuses for next comparison
+      const newPreviousStatuses = {};
+      websitesWithStatus.forEach(website => {
+        newPreviousStatuses[website.id] = website.lastStatus;
+      });
+      setPreviousWebsiteStatuses(newPreviousStatuses);
 
       setWebsites(websitesWithStatus);
       setStatusesByWebsite(nextStatusesByWebsite);
