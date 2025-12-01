@@ -15,7 +15,11 @@ import (
 
 func main() {
 	// Initialize services
-	storageService := services.NewStorageService()
+	storageService, err := services.NewStorageService()
+	if err != nil {
+		fmt.Printf("❌ Failed to initialize storage service: %v\n", err)
+		os.Exit(1)
+	}
 	monitorService := services.NewMonitorService()
 	sslService := services.NewSSLService()
 
@@ -25,7 +29,11 @@ func main() {
 	// }
 
 	// Create a test website if none exist
-	websites := storageService.GetWebsites()
+	websites, err := storageService.GetWebsites()
+	if err != nil {
+		fmt.Printf("⚠️ Warning: Could not load websites: %v\n", err)
+		websites = []models.Website{}
+	}
 	if len(websites) == 0 {
 		testWebsites := []models.Website{
 			{
@@ -65,8 +73,12 @@ func main() {
 
 	// Function to check all websites (uptime/latency)
 	checkAllWebsites := func() {
-		websites := storageService.GetWebsites()
-		fmt.Printf("Checking %d websites...\n", len(websites))
+		websites, err := storageService.GetWebsites()
+		if err != nil {
+			fmt.Printf("❌ Error fetching websites: %v\n", err)
+			return
+		}
+		fmt.Printf("🔍 Checking %d websites...\n", len(websites))
 
 		for _, website := range websites {
 			fmt.Printf("Checking %s (%s)...\n", website.Name, website.URL)
@@ -92,14 +104,20 @@ func main() {
 
 	// Run SSL checks one time at startup
 	go func() {
-		websites := storageService.GetWebsites()
+		websites, err := storageService.GetWebsites()
+		if err != nil {
+			fmt.Printf("⚠️ Failed to get websites for SSL check: %v\n", err)
+			return
+		}
 		for _, w := range websites {
 			info, err := sslService.Check(w.URL)
 			if err != nil || info == nil {
 				continue
 			}
 			info.WebsiteID = w.ID
-			_ = storageService.SaveSSL(*info)
+			if err := storageService.SaveSSL(*info); err != nil {
+				fmt.Printf("⚠️ Failed to save SSL info for %s: %v\n", w.Name, err)
+			}
 		}
 	}()
 
@@ -108,14 +126,20 @@ func main() {
 
 	// Schedule daily SSL checks (once a day is enough)
 	c.AddFunc("@daily", func() {
-		websites := storageService.GetWebsites()
+		websites, err := storageService.GetWebsites()
+		if err != nil {
+			fmt.Printf("⚠️ Failed to get websites for daily SSL check: %v\n", err)
+			return
+		}
 		for _, w := range websites {
 			info, err := sslService.Check(w.URL)
 			if err != nil || info == nil {
 				continue
 			}
 			info.WebsiteID = w.ID
-			_ = storageService.SaveSSL(*info) // upsert latest SSL info
+			if err := storageService.SaveSSL(*info); err != nil {
+				fmt.Printf("⚠️ Failed to save SSL info for %s: %v\n", w.Name, err)
+			}
 		}
 	})
 
@@ -139,13 +163,20 @@ func main() {
 
 	// Get all websites
 	app.Get("/api/websites", func(c *fiber.Ctx) error {
-		return c.JSON(storageService.GetWebsites())
+		websites, err := storageService.GetWebsites()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites", "details": err.Error()})
+		}
+		return c.JSON(websites)
 	})
 
 	// Get website by ID
 	app.Get("/api/websites/:id", func(c *fiber.Ctx) error {
 		id := c.Params("id")
-		websites := storageService.GetWebsites()
+		websites, err := storageService.GetWebsites()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites", "details": err.Error()})
+		}
 
 		for _, website := range websites {
 			if website.ID == id {
@@ -160,8 +191,12 @@ func main() {
 	app.Get("/api/websites/:id/ssl", func(c *fiber.Ctx) error {
 		id := c.Params("id")
 		// find website
+		websites, err := storageService.GetWebsites()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites", "details": err.Error()})
+		}
 		var site *models.Website
-		for _, w := range storageService.GetWebsites() {
+		for _, w := range websites {
 			if w.ID == id {
 				site = &w
 				break
@@ -188,7 +223,10 @@ func main() {
 
 	// Get SSL summary (earliest expiry)
 	app.Get("/api/ssl/summary", func(c *fiber.Ctx) error {
-		sites := storageService.GetWebsites()
+		sites, err := storageService.GetWebsites()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites", "details": err.Error()})
+		}
 		var soonest *models.SSLInfo
 		var soonestSite *models.Website
 
@@ -216,7 +254,10 @@ func main() {
 	// Get status history for a website
 	app.Get("/api/websites/:id/status", func(c *fiber.Ctx) error {
 		id := c.Params("id")
-		statuses := storageService.GetWebsiteStatuses(id)
+		statuses, err := storageService.GetWebsiteStatuses(id)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch status history", "details": err.Error()})
+		}
 
 		// Convert timestamps to readable format
 		type StatusWithTime struct {

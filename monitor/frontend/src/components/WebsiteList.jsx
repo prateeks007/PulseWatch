@@ -1,6 +1,8 @@
 import React, { useContext, useState } from "react";
 import { ThemeContext } from "../context/ThemeContext";
 import { MoreVertical } from "lucide-react";
+import StatusIndicator, { StatusDot } from "./StatusIndicator";
+import UptimeBadge from "./UptimeBadge";
 
 function getFavicon(url) {
   try {
@@ -51,15 +53,7 @@ export default function WebsiteList({ websites, selectedWebsite, onSelect, onDel
               ? "border-l-4 border-rose-500"
               : "border-l-4 border-amber-500";
 
-          const statusLabel =
-            last === true ? "Online" : last === false ? "Offline" : "Unknown";
-
-          const statusBadgeCls =
-            last === true
-              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-              : last === false
-              ? "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400"
-              : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400";
+          const statusValue = last === true ? 'online' : last === false ? 'offline' : 'unknown';
 
           const rowCls = [
             baseRow,
@@ -88,14 +82,17 @@ export default function WebsiteList({ websites, selectedWebsite, onSelect, onDel
                   loading="lazy"
                 />
                 <div className="flex-1 min-w-0">
-                  <div
-                    className={
-                      darkMode
-                        ? "text-white/90 font-medium truncate"
-                        : "text-gray-900 font-medium truncate"
-                    }
-                  >
-                    {w.name}
+                  <div className="flex items-center gap-2 mb-1">
+                    <div
+                      className={
+                        darkMode
+                          ? "text-white/90 font-medium truncate"
+                          : "text-gray-900 font-medium truncate"
+                      }
+                    >
+                      {w.name}
+                    </div>
+                    <StatusDot status={statusValue} size="sm" />
                   </div>
                   <div
                     className={
@@ -106,11 +103,10 @@ export default function WebsiteList({ websites, selectedWebsite, onSelect, onDel
                   >
                     {w.url}
                   </div>
-                  <span
-                    className={`mt-1 inline-block text-[10px] px-2 py-0.5 rounded-full font-medium ${statusBadgeCls} transition-colors duration-200 group-hover:brightness-110`}
-                  >
-                    {statusLabel}
-                  </span>
+                  <div className="mt-2 flex items-center justify-between">
+                    <StatusIndicator status={statusValue} size="xs" showText={true} />
+                    <UptimeBadge percentage={w.uptimePercentage || 0} size="xs" />
+                  </div>
                 </div>
               </button>
 

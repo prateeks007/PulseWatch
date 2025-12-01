@@ -8,9 +8,13 @@ import SummaryDashboard from './components/SummaryDashboard';
 import WebsiteDetailsCard from './components/WebsiteDetailsCard';
 import AddWebsiteModal from './components/AddWebsiteModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
+import LoadingSkeleton from './components/LoadingSkeleton';
+import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeContext } from './context/ThemeContext';
 import { useToast } from './components/ToastProvider';
 import { debounce } from 'lodash';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { calculateUptimePercentage } from './utils/uptimeCalculator';
 
 function App() {
   const { darkMode } = useContext(ThemeContext);
@@ -60,18 +64,28 @@ function App() {
               const slice = statusResponse.data.slice(0, 120);
               nextStatusesByWebsite[website.id] = slice;
 
+              // Calculate uptime percentage for last 24 hours
+              const uptimePercentage = calculateUptimePercentage(slice, 24);
+
               return {
                 ...website,
                 lastStatus: latest.is_up,
                 last10Statuses: slice.slice(0, 10),
+                uptimePercentage,
               };
             }
             nextStatusesByWebsite[website.id] = [];
-            return website;
+            return {
+              ...website,
+              uptimePercentage: 0,
+            };
           } catch (err) {
             console.error(`Failed to fetch status for website ${website.id}:`, err);
             nextStatusesByWebsite[website.id] = [];
-            return website;
+            return {
+              ...website,
+              uptimePercentage: 0,
+            };
           }
         })
       );
@@ -213,21 +227,61 @@ function App() {
   const toggleSummary = () => setShowSummary(!showSummary);
 
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+    return (
+      <div className={`min-h-screen transition-colors duration-200 ${
+        darkMode
+          ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900'
+          : 'bg-gradient-to-br from-blue-50 via-white to-blue-100'
+      }`}>
+        <div className="container mx-auto px-4 py-8">
+          <LoadingSkeleton type="dashboard" />
+        </div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="flex justify-center items-center h-screen text-red-500">{error}</div>;
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 ${
+        darkMode ? 'bg-gray-900' : 'bg-gray-50'
+      }`}>
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
+          <div className="flex justify-center mb-6">
+            <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
+              <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Connection Error
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            {error}
+          </p>
+          <button
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              fetchWebsites();
+            }}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div
-      className={`min-h-screen transition-colors duration-200 ${
-        darkMode
-          ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 animate-gradient-x'
-          : 'bg-gradient-to-br from-blue-50 via-white to-blue-100 animate-gradient-x'
-      }`}
-    >
+    <ErrorBoundary>
+      <div
+        className={`min-h-screen transition-colors duration-200 ${
+          darkMode
+            ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 animate-gradient-x'
+            : 'bg-gradient-to-br from-blue-50 via-white to-blue-100 animate-gradient-x'
+        }`}
+      >
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8 flex justify-between items-center sticky top-0 z-20 backdrop-blur-md bg-opacity-80">
           <div>
@@ -337,7 +391,8 @@ function App() {
           }
         }}
       />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
 
