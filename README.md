@@ -10,8 +10,11 @@ PulseWatch is a lightweight yet powerful website uptime and health monitor built
 * 🔄 Cron-based periodic execution
 * 💡 Pluggable storage (easily extend to Redis, SQL, etc.)
 * 📈 Real-time console logs
-* 🧰 Future-ready for dashboard and alerting integrations
-* 📁 Frontend for a live dashboard
+* 🚨 **Discord alerts** - Get notified when sites go up/down
+* 🔒 **SSL certificate monitoring** - Track certificate expiry dates
+* 📁 **Modern React dashboard** - Beautiful real-time UI with dark/light themes
+* 📊 **Charts & analytics** - Response time graphs and uptime statistics
+* 🛡️ **Smart alerting** - Only alerts on status changes (no spam)
 
 ---
 
@@ -47,6 +50,7 @@ cd PulseWatch
   ` env   MONGO_URI="your-connection-uri"   MONGO_DB_NAME="pulsewatch_db"    `
 
   * **Note:** The `pulsewatch_db` database and its collections will be automatically created on the first run.
+  * **Discord Alerts (Optional):** Create a Discord webhook in your server settings to receive notifications when websites go up/down.
 
 ### 3\. Setup and Run the Backend
 
@@ -98,9 +102,11 @@ The backend is located in the `monitor/backend` directory, but the main entry po
 
 ## 📈 Future Plans
 
-  * Web dashboard with charts
-  * Alerting: Email, Slack, SMS
+  * ~~Web dashboard with charts~~ ✅ **DONE**
+  * ~~Alerting: Discord~~ ✅ **DONE** 
+  * Email, Slack, SMS alerts
   * User authentication (multi-tenant)
+  * Data cleanup and retention policies
   * Docker + Helm deployment
   * Prometheus + Grafana exporter
 
