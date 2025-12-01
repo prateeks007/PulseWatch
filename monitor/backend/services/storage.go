@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -23,7 +24,7 @@ type StorageService struct {
 	mongoURI     string
 }
 
-func NewStorageService() *StorageService {
+func NewStorageService() (*StorageService, error) {
 	_ = godotenv.Load()
 	uri := os.Getenv("MONGO_URI")
 	dbName := os.Getenv("MONGO_DB_NAME")
@@ -31,13 +32,14 @@ func NewStorageService() *StorageService {
 		dbName = "pulsewatch_db"
 	}
 	if uri == "" {
-		log.Fatalf("MONGO_URI not set")
+		return nil, fmt.Errorf("MONGO_URI environment variable not set")
 	}
 	s := &StorageService{mongoURI: uri, databaseName: dbName}
 	if err := s.ConnectMongoDB(uri, dbName); err != nil {
-		log.Fatalf("Failed to connect Mongo: %v", err)
+		return nil, fmt.Errorf("failed to connect to MongoDB: %w", err)
 	}
-	return s
+	log.Printf("✅ Storage service initialized successfully")
+	return s, nil
 }
 
 func (s *StorageService) ConnectMongoDB(uri, dbName string) error {
@@ -62,27 +64,25 @@ func (s *StorageService) ConnectMongoDB(uri, dbName string) error {
 	return nil
 }
 
-func (s *StorageService) GetWebsites() []models.Website {
+func (s *StorageService) GetWebsites() ([]models.Website, error) {
 	var sites []models.Website
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	cursor, err := s.websitesColl.Find(ctx, bson.M{})
 	if err != nil {
-		log.Printf("GetWebsites Find error: %v", err)
-		return sites
+		return nil, fmt.Errorf("failed to find websites: %w", err)
 	}
 	defer func() {
 		if err := cursor.Close(ctx); err != nil {
-			log.Printf("GetWebsites cursor.Close error: %v", err)
+			log.Printf("⚠️ Failed to close cursor: %v", err)
 		}
 	}()
 
 	if err := cursor.All(ctx, &sites); err != nil {
-		log.Printf("GetWebsites cursor.All error: %v", err)
-		return []models.Website{}
+		return nil, fmt.Errorf("failed to decode websites: %w", err)
 	}
-	return sites
+	return sites, nil
 }
 
 func (s *StorageService) SaveWebsite(website models.Website) error {
@@ -95,9 +95,9 @@ func (s *StorageService) SaveWebsite(website models.Website) error {
 		options.Update().SetUpsert(true),
 	)
 	if err != nil {
-		log.Printf("SaveWebsite error: %v", err)
+		return fmt.Errorf("failed to save website %s: %w", website.Name, err)
 	}
-	return err
+	return nil
 }
 
 func (s *StorageService) SaveStatus(status models.WebsiteStatus) error {
@@ -108,18 +108,18 @@ func (s *StorageService) SaveStatus(status models.WebsiteStatus) error {
 		"website_id":       status.WebsiteID,
 		"is_up":            status.IsUp,
 		"status_code":      status.StatusCode,
-		"response_time_ms": status.ResponseTime,            // keep key consistent with model
-		"checked_at":       status.CheckedAt,               // unix seconds
-		"checked_at_date":  time.Unix(status.CheckedAt, 0), // Mongo Date for TTL
+		"response_time_ms": status.ResponseTime,
+		"checked_at":       status.CheckedAt,
+		"checked_at_date":  time.Unix(status.CheckedAt, 0),
 	}
 	_, err := s.statusesColl.InsertOne(ctx, doc)
 	if err != nil {
-		log.Printf("SaveStatus InsertOne error: %v", err)
+		return fmt.Errorf("failed to save status for website %s: %w", status.WebsiteID, err)
 	}
-	return err
+	return nil
 }
 
-func (s *StorageService) GetWebsiteStatuses(websiteID string) []models.WebsiteStatus {
+func (s *StorageService) GetWebsiteStatuses(websiteID string) ([]models.WebsiteStatus, error) {
 	var statuses []models.WebsiteStatus
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
@@ -130,20 +130,18 @@ func (s *StorageService) GetWebsiteStatuses(websiteID string) []models.WebsiteSt
 		options.Find().SetSort(bson.D{{Key: "checked_at", Value: -1}}).SetLimit(500),
 	)
 	if err != nil {
-		log.Printf("GetWebsiteStatuses Find error: %v", err)
-		return statuses
+		return nil, fmt.Errorf("failed to find statuses for website %s: %w", websiteID, err)
 	}
 	defer func() {
 		if err := cursor.Close(ctx); err != nil {
-			log.Printf("GetWebsiteStatuses cursor.Close error: %v", err)
+			log.Printf("⚠️ Failed to close cursor: %v", err)
 		}
 	}()
 
 	if err := cursor.All(ctx, &statuses); err != nil {
-		log.Printf("GetWebsiteStatuses cursor.All error: %v", err)
-		return []models.WebsiteStatus{}
+		return nil, fmt.Errorf("failed to decode statuses for website %s: %w", websiteID, err)
 	}
-	return statuses
+	return statuses, nil
 }
 
 // --- SSL ---
@@ -192,6 +190,16 @@ func (s *StorageService) DeleteWebsite(id string) error {
 		log.Printf("DeleteWebsite ssl delete error: %v", err)
 	}
 	return nil
+}
+
+// GetStatusesCollection returns the statuses collection for cleanup service
+func (s *StorageService) GetStatusesCollection() *mongo.Collection {
+	return s.statusesColl
+}
+
+// GetWebsitesCollection returns the websites collection for cleanup service
+func (s *StorageService) GetWebsitesCollection() *mongo.Collection {
+	return s.websitesColl
 }
 
 // --- The original JSON-specific file methods are now removed ---

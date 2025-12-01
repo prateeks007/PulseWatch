@@ -1,6 +1,7 @@
 import React, { useContext, useMemo, useEffect, useState } from "react";
 import { ThemeContext } from "../context/ThemeContext";
-import { Globe, CheckCircle, Clock, Zap, Shield } from "lucide-react";
+import { Globe, CheckCircle, Clock, Zap, Shield, TrendingUp, Activity } from "lucide-react";
+import StatusIndicator from "./StatusIndicator";
 import axios from "axios";
 
 function SummaryDashboard({
@@ -104,232 +105,210 @@ function SummaryDashboard({
   }, [websites, statusesByWebsite, latestStatusesMap, cutoff]);
 
   return (
-    <div
-      className={`${
-        darkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"
-      } rounded-lg shadow-xl p-6 mb-6`}
-    >
-      <h2 className="text-2xl font-bold mb-6 text-center">System Overview</h2>
+    <div className="mb-8 animate-fade-in">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            System Overview
+          </h2>
+          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mt-1`}>
+            Real-time monitoring dashboard
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Activity className={`h-5 w-5 ${darkMode ? 'text-green-400' : 'text-green-500'} animate-pulse`} />
+          <span className={`text-sm font-medium ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+            Live
+          </span>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total Websites */}
-        <div
-          className={`p-5 rounded-xl border ${
-            darkMode
-              ? "bg-gray-700 border-gray-600"
-              : "bg-blue-50 border-blue-100"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className={`text-sm font-medium ${
-                  darkMode ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
+        <div className={`group relative overflow-hidden rounded-xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${
+          darkMode
+            ? "bg-gray-800/50 border-gray-700 hover:bg-gray-800"
+            : "bg-white border-gray-200 hover:bg-gray-50"
+        }`}>
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className={`text-sm font-medium ${
+                darkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
                 Total Websites
               </p>
-              <p className="text-3xl font-extrabold mt-1">{totalWebsites}</p>
+              <div className={`p-2 rounded-lg ${
+                darkMode ? "bg-blue-500/10" : "bg-blue-50"
+              }`}>
+                <Globe className={`h-5 w-5 ${
+                  darkMode ? "text-blue-400" : "text-blue-600"
+                }`} />
+              </div>
             </div>
-            <div
-              className={`p-3 rounded-full ${
-                darkMode ? "bg-gray-600" : "bg-blue-100"
-              }`}
-            >
-              <Globe
-                className={`h-7 w-7 ${
-                  darkMode ? "text-blue-400" : "text-blue-500"
-                }`}
-              />
+            <div className="flex items-baseline space-x-2">
+              <p className={`text-2xl font-bold ${
+                darkMode ? "text-white" : "text-gray-900"
+              }`}>{totalWebsites}</p>
+              <span className={`text-sm ${
+                darkMode ? "text-gray-400" : "text-gray-500"
+              }`}>sites</span>
             </div>
           </div>
+          <div className={`absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-blue-500 to-blue-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200`} />
         </div>
 
-        {/* Online vs Offline */}
-        <div
-          className={`p-5 rounded-xl border ${
-            darkMode
-              ? "bg-gray-700 border-gray-600"
-              : "bg-green-50 border-green-100"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className={`text-sm font-medium ${
-                  darkMode ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
+        {/* Online Status */}
+        <div className={`group relative overflow-hidden rounded-xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${
+          darkMode
+            ? "bg-gray-800/50 border-gray-700 hover:bg-gray-800"
+            : "bg-white border-gray-200 hover:bg-gray-50"
+        }`}>
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className={`text-sm font-medium ${
+                darkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
                 Online
               </p>
-              <p className="text-3xl font-extrabold mt-1 text-green-500">
-                {onlineWebsites}{" "}
-                <span className="text-lg font-normal">of {totalWebsites}</span>
-              </p>
+              <StatusIndicator status="online" size="md" />
             </div>
-            <div
-              className={`p-3 rounded-full ${
-                darkMode ? "bg-gray-600" : "bg-green-100"
-              }`}
-            >
-              <CheckCircle
-                className={`h-7 w-7 ${
-                  darkMode ? "text-green-400" : "text-green-500"
-                }`}
-              />
+            <div className="flex items-baseline space-x-2 mb-3">
+              <p className="text-2xl font-bold text-green-500">{onlineWebsites}</p>
+              <span className={`text-sm ${
+                darkMode ? "text-gray-400" : "text-gray-500"
+              }`}>of {totalWebsites}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="flex items-center space-x-1">
+                <StatusIndicator status="offline" size="xs" />
+                <span className={darkMode ? "text-red-400" : "text-red-500"}>Offline: {offlineWebsites}</span>
+              </span>
+              <span className="flex items-center space-x-1">
+                <StatusIndicator status="unknown" size="xs" />
+                <span className={darkMode ? "text-yellow-400" : "text-yellow-500"}>Unknown: {unknownWebsites}</span>
+              </span>
             </div>
           </div>
-          <div className="mt-3 flex items-center justify-between text-sm">
-            <span
-              className={`${
-                darkMode ? "text-red-400" : "text-red-500"
-              } font-medium`}
-            >
-              Offline: {offlineWebsites}
-            </span>
-            <span
-              className={`${
-                darkMode ? "text-yellow-400" : "text-yellow-500"
-              } font-medium`}
-            >
-              Unknown: {unknownWebsites}
-            </span>
-          </div>
+          <div className={`absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-green-500 to-emerald-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200`} />
         </div>
 
         {/* Average Response Time */}
-        <div
-          className={`p-5 rounded-xl border ${
-            darkMode
-              ? "bg-gray-700 border-gray-600"
-              : "bg-purple-50 border-purple-100"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className={`text-sm font-medium ${
-                  darkMode ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
+        <div className={`group relative overflow-hidden rounded-xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${
+          darkMode
+            ? "bg-gray-800/50 border-gray-700 hover:bg-gray-800"
+            : "bg-white border-gray-200 hover:bg-gray-50"
+        }`}>
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className={`text-sm font-medium ${
+                darkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
                 Avg Response Time
               </p>
-              <p className="text-3xl font-extrabold mt-1">
-                {avgResponseTime}
-                <span className="text-lg font-normal ml-1">ms</span>
-              </p>
+              <div className={`p-2 rounded-lg ${
+                darkMode ? "bg-purple-500/10" : "bg-purple-50"
+              }`}>
+                <Clock className={`h-5 w-5 ${
+                  darkMode ? "text-purple-400" : "text-purple-600"
+                }`} />
+              </div>
             </div>
-            <div
-              className={`p-3 rounded-full ${
-                darkMode ? "bg-gray-600" : "bg-purple-100"
-              }`}
-            >
-              <Clock
-                className={`h-7 w-7 ${
-                  darkMode ? "text-purple-400" : "text-purple-500"
-                }`}
-              />
+            <div className="flex items-baseline space-x-2">
+              <p className={`text-2xl font-bold ${
+                darkMode ? "text-white" : "text-gray-900"
+              }`}>{avgResponseTime}</p>
+              <span className={`text-sm ${
+                darkMode ? "text-gray-400" : "text-gray-500"
+              }`}>ms</span>
             </div>
           </div>
+          <div className={`absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-purple-500 to-purple-600 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200`} />
         </div>
 
         {/* Slowest Website */}
-        <div
-          className={`p-5 rounded-xl border ${
-            darkMode
-              ? "bg-gray-700 border-gray-600"
-              : "bg-yellow-50 border-yellow-100"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className={`text-sm font-medium ${
-                  darkMode ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
+        <div className={`group relative overflow-hidden rounded-xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${
+          darkMode
+            ? "bg-gray-800/50 border-gray-700 hover:bg-gray-800"
+            : "bg-white border-gray-200 hover:bg-gray-50"
+        }`}>
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className={`text-sm font-medium ${
+                darkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
                 Slowest Website
               </p>
-              <p className="text-lg font-extrabold mt-1 truncate max-w-[140px]">
+              <div className={`p-2 rounded-lg ${
+                darkMode ? "bg-yellow-500/10" : "bg-yellow-50"
+              }`}>
+                <TrendingUp className={`h-5 w-5 ${
+                  darkMode ? "text-yellow-400" : "text-yellow-600"
+                }`} />
+              </div>
+            </div>
+            <div className="mb-2">
+              <p className={`text-lg font-bold truncate ${
+                darkMode ? "text-white" : "text-gray-900"
+              }`}>
                 {slowestWebsiteName || "N/A"}
               </p>
             </div>
-            <div
-              className={`p-3 rounded-full ${
-                darkMode ? "bg-gray-600" : "bg-yellow-100"
-              }`}
-            >
-              <Zap
-                className={`h-7 w-7 ${
-                  darkMode ? "text-yellow-400" : "text-yellow-500"
-                }`}
-              />
+            <div className="text-sm">
+              <span className={`font-medium ${
+                darkMode ? "text-yellow-400" : "text-yellow-600"
+              }`}>
+                {slowestResponseTime > 0 ? `${slowestResponseTime} ms` : "No data"}
+              </span>
             </div>
           </div>
-          <div className="mt-3 text-sm">
-            <span
-              className={`${
-                darkMode ? "text-gray-300" : "text-gray-600"
-              } font-medium`}
-            >
-              {slowestResponseTime > 0
-                ? `${slowestResponseTime} ms`
-                : "No data"}
-            </span>
-          </div>
+          <div className={`absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-yellow-500 to-orange-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200`} />
         </div>
 
         {/* SSL Summary */}
-        <div
-          className={`p-5 rounded-xl border ${
-            darkMode
-              ? "bg-gray-700 border-gray-600"
-              : "bg-indigo-50 border-indigo-100"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p
-                className={`text-sm font-medium ${
-                  darkMode ? "text-gray-300" : "text-gray-600"
-                }`}
-              >
+        <div className={`group relative overflow-hidden rounded-xl border transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${
+          darkMode
+            ? "bg-gray-800/50 border-gray-700 hover:bg-gray-800"
+            : "bg-white border-gray-200 hover:bg-gray-50"
+        }`}>
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className={`text-sm font-medium ${
+                darkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
                 Earliest SSL Expiry
               </p>
-              <p className="text-lg font-extrabold mt-1 truncate max-w-[140px]">
+              <div className={`p-2 rounded-lg ${
+                darkMode ? "bg-indigo-500/10" : "bg-indigo-50"
+              }`}>
+                <Shield className={`h-5 w-5 ${
+                  darkMode ? "text-indigo-400" : "text-indigo-600"
+                }`} />
+              </div>
+            </div>
+            <div className="mb-2">
+              <p className={`text-lg font-bold truncate ${
+                darkMode ? "text-white" : "text-gray-900"
+              }`}>
                 {sslSummary?.name || "N/A"}
               </p>
             </div>
-            <div
-              className={`p-3 rounded-full ${
-                darkMode ? "bg-gray-600" : "bg-indigo-100"
-              }`}
-            >
-              <Shield
-                className={`h-7 w-7 ${
-                  darkMode ? "text-indigo-400" : "text-indigo-500"
-                }`}
-              />
-            </div>
-          </div>
-          <div className="mt-3 text-sm">
-            {sslSummary?.days_left !== undefined ? (
-              <span
-                className={
+            <div className="text-sm">
+              {sslSummary?.days_left !== undefined ? (
+                <span className={`font-medium ${
                   sslSummary.days_left <= 7
                     ? "text-red-500"
                     : sslSummary.days_left <= 30
                     ? "text-yellow-500"
                     : "text-green-500"
-                }
-              >
-                {sslSummary.days_left} days left (till{" "}
-                {new Date(sslSummary.valid_to * 1000).toLocaleDateString()})
-              </span>
-            ) : (
-              <span>No data</span>
-            )}
+                }`}>
+                  {sslSummary.days_left} days left
+                </span>
+              ) : (
+                <span className={darkMode ? "text-gray-400" : "text-gray-500"}>No data</span>
+              )}
+            </div>
           </div>
+          <div className={`absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-indigo-500 to-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-200`} />
         </div>
       </div>
     </div>

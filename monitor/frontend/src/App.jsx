@@ -8,9 +8,13 @@ import SummaryDashboard from './components/SummaryDashboard';
 import WebsiteDetailsCard from './components/WebsiteDetailsCard';
 import AddWebsiteModal from './components/AddWebsiteModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
+import LoadingSkeleton from './components/LoadingSkeleton';
+import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeContext } from './context/ThemeContext';
 import { useToast } from './components/ToastProvider';
 import { debounce } from 'lodash';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { calculateUptimePercentage } from './utils/uptimeCalculator';
 
 function App() {
   const { darkMode } = useContext(ThemeContext);
@@ -21,9 +25,11 @@ function App() {
   const [statuses, setStatuses] = useState([]);
   const [latestStatusesAllSites, setLatestStatusesAllSites] = useState([]);
   const [statusesByWebsite, setStatusesByWebsite] = useState({});
+  const [previousWebsiteStatuses, setPreviousWebsiteStatuses] = useState({}); // Track previous status
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({ status: 'all', maxResponseTime: null });
+  const [searchTerm, setSearchTerm] = useState(''); // New search state
   const [showSummary, setShowSummary] = useState(true);
   const [rangeHours, setRangeHours] = useState(3);
 
@@ -60,21 +66,55 @@ function App() {
               const slice = statusResponse.data.slice(0, 120);
               nextStatusesByWebsite[website.id] = slice;
 
+              // Calculate uptime percentage for last 24 hours
+              const uptimePercentage = calculateUptimePercentage(slice, 24);
+
               return {
                 ...website,
                 lastStatus: latest.is_up,
                 last10Statuses: slice.slice(0, 10),
+                uptimePercentage,
               };
             }
             nextStatusesByWebsite[website.id] = [];
-            return website;
+            return {
+              ...website,
+              uptimePercentage: 0,
+            };
           } catch (err) {
             console.error(`Failed to fetch status for website ${website.id}:`, err);
             nextStatusesByWebsite[website.id] = [];
-            return website;
+            return {
+              ...website,
+              uptimePercentage: 0,
+            };
           }
         })
       );
+
+      // Check for status changes and show notifications
+      websitesWithStatus.forEach(website => {
+        const currentStatus = website.lastStatus;
+        const previousStatus = previousWebsiteStatuses[website.id];
+        
+        // Only show notification if we have a previous status and it changed
+        if (previousStatus !== undefined && previousStatus !== currentStatus) {
+          if (currentStatus === true && previousStatus === false) {
+            // Website came back online
+            addToast(`✅ ${website.name} is back online!`, 'success', 5000);
+          } else if (currentStatus === false && previousStatus === true) {
+            // Website went offline
+            addToast(`❌ ${website.name} went offline!`, 'error', 5000);
+          }
+        }
+      });
+
+      // Update previous statuses for next comparison
+      const newPreviousStatuses = {};
+      websitesWithStatus.forEach(website => {
+        newPreviousStatuses[website.id] = website.lastStatus;
+      });
+      setPreviousWebsiteStatuses(newPreviousStatuses);
 
       setWebsites(websitesWithStatus);
       setStatusesByWebsite(nextStatusesByWebsite);
@@ -123,9 +163,15 @@ function App() {
       // Refresh full list in background (to pull computed fields)
       fetchWebsites();
     } catch (err) {
-      console.error('Add website failed:', err);
-      addToast('Failed to add website ❌', 'error');
-      throw err;
+      // Check if it's a validation error from backend
+      if (err.response?.status === 400 && err.response?.data?.validation_errors) {
+        // Let the modal handle validation errors
+        throw err;
+      } else {
+        // Show generic error toast for other errors
+        addToast('Failed to add website ❌', 'error');
+        throw err;
+      }
     }
   };
 
@@ -173,27 +219,39 @@ function App() {
   };
 
   const filteredWebsites = useMemo(() => {
-    if (filters.status === 'all' && (filters.maxResponseTime === null || filters.maxResponseTime <= 0)) {
-      return websites;
+    let filtered = websites;
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter((website) => 
+        website.name.toLowerCase().includes(searchLower) ||
+        website.url.toLowerCase().includes(searchLower)
+      );
     }
 
-    return websites.filter((website) => {
-      if (filters.status !== 'all') {
-        if (filters.status === 'online' && website.lastStatus !== true) return false;
-        if (filters.status === 'offline' && website.lastStatus !== false) return false;
-        if (filters.status === 'unknown' && (website.lastStatus === true || website.lastStatus === false)) return false;
-      }
-
-      if (filters.maxResponseTime && filters.maxResponseTime > 0 && statuses.length > 0) {
-        const relevantStatus = statuses.find((status) => status.website_id === website.id);
-        if (relevantStatus && relevantStatus.response_time_ms > filters.maxResponseTime) {
-          return false;
+    // Apply status and response time filters
+    if (filters.status !== 'all' || (filters.maxResponseTime && filters.maxResponseTime > 0)) {
+      filtered = filtered.filter((website) => {
+        if (filters.status !== 'all') {
+          if (filters.status === 'online' && website.lastStatus !== true) return false;
+          if (filters.status === 'offline' && website.lastStatus !== false) return false;
+          if (filters.status === 'unknown' && (website.lastStatus === true || website.lastStatus === false)) return false;
         }
-      }
 
-      return true;
-    });
-  }, [websites, filters, statuses]);
+        if (filters.maxResponseTime && filters.maxResponseTime > 0 && statuses.length > 0) {
+          const relevantStatus = statuses.find((status) => status.website_id === website.id);
+          if (relevantStatus && relevantStatus.response_time_ms > filters.maxResponseTime) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [websites, searchTerm, filters, statuses]);
 
   useEffect(() => {
     if (filteredWebsites.length === 0) {
@@ -213,21 +271,61 @@ function App() {
   const toggleSummary = () => setShowSummary(!showSummary);
 
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+    return (
+      <div className={`min-h-screen transition-colors duration-200 ${
+        darkMode
+          ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900'
+          : 'bg-gradient-to-br from-blue-50 via-white to-blue-100'
+      }`}>
+        <div className="container mx-auto px-4 py-8">
+          <LoadingSkeleton type="dashboard" />
+        </div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="flex justify-center items-center h-screen text-red-500">{error}</div>;
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 ${
+        darkMode ? 'bg-gray-900' : 'bg-gray-50'
+      }`}>
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
+          <div className="flex justify-center mb-6">
+            <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-full">
+              <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Connection Error
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            {error}
+          </p>
+          <button
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              fetchWebsites();
+            }}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div
-      className={`min-h-screen transition-colors duration-200 ${
-        darkMode
-          ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 animate-gradient-x'
-          : 'bg-gradient-to-br from-blue-50 via-white to-blue-100 animate-gradient-x'
-      }`}
-    >
+    <ErrorBoundary>
+      <div
+        className={`min-h-screen transition-colors duration-200 ${
+          darkMode
+            ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 animate-gradient-x'
+            : 'bg-gradient-to-br from-blue-50 via-white to-blue-100 animate-gradient-x'
+        }`}
+      >
       <div className="container mx-auto px-4 py-8">
         <header className="mb-8 flex justify-between items-center sticky top-0 z-20 backdrop-blur-md bg-opacity-80">
           <div>
@@ -266,7 +364,7 @@ function App() {
           />
         )}
 
-        <FilterBar filters={filters} setFilters={handleFilterChange} />
+        <FilterBar filters={filters} setFilters={handleFilterChange} searchTerm={searchTerm} onSearch={setSearchTerm} />
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="md:col-span-1">
@@ -278,6 +376,8 @@ function App() {
                 setWebsiteToDelete(w);
                 setShowDeleteModal(true);
               }}
+              totalCount={websites.length}
+              statusesByWebsite={statusesByWebsite}
             />
           </div>
 
@@ -314,8 +414,13 @@ function App() {
           try {
             await addWebsite(data);
             setShowAddModal(false);
-          } catch {
-            // toast already shown in addWebsite
+          } catch (error) {
+            // Only close modal on success, let modal handle validation errors
+            if (error.response?.status === 400 && error.response?.data?.validation_errors) {
+              // Re-throw validation errors so modal can display them
+              throw error;
+            }
+            // For other errors, toast was already shown in addWebsite
           }
         }}
       />
@@ -337,7 +442,8 @@ function App() {
           }
         }}
       />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
 
