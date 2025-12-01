@@ -23,6 +23,8 @@ func main() {
 	}
 	monitorService := services.NewMonitorService()
 	sslService := services.NewSSLService()
+	cleanupService := services.NewCleanupService(storageService.GetStatusesCollection())
+	discordService := services.NewDiscordService()
 
 	// Load any existing data
 	// if err := storageService.LoadFromFiles(); err != nil {
@@ -72,6 +74,9 @@ func main() {
 	// Create a new cron scheduler
 	c := cron.New()
 
+	// Track previous statuses to avoid spam
+	previousStatuses := make(map[string]bool)
+
 	// Function to check all websites (uptime/latency)
 	checkAllWebsites := func() {
 		websites, err := storageService.GetWebsites()
@@ -87,10 +92,24 @@ func main() {
 			status, err := monitorService.CheckWebsite(website)
 			if err != nil {
 				fmt.Printf("  Error: %v\n", err)
+				// Only alert if status changed from up to down
+				if prevStatus, exists := previousStatuses[website.ID]; !exists || prevStatus {
+					discordService.SendAlert(website, false, 0)
+				}
+				previousStatuses[website.ID] = false
 			} else {
 				if err := storageService.SaveStatus(status); err != nil {
 					fmt.Printf("  Error saving status: %v\n", err)
 				}
+
+				// Only alert on status changes
+				if prevStatus, exists := previousStatuses[website.ID]; exists && prevStatus != status.IsUp {
+					discordService.SendAlert(website, status.IsUp, status.ResponseTime)
+				} else if !exists && !status.IsUp {
+					// First check and it's down
+					discordService.SendAlert(website, false, status.ResponseTime)
+				}
+				previousStatuses[website.ID] = status.IsUp
 
 				fmt.Printf("  Status: %v (Code: %d, Response time: %d ms)\n",
 					status.IsUp, status.StatusCode, status.ResponseTime)
@@ -141,6 +160,16 @@ func main() {
 			if err := storageService.SaveSSL(*info); err != nil {
 				fmt.Printf("⚠️ Failed to save SSL info for %s: %v\n", w.Name, err)
 			}
+		}
+	})
+
+	// Schedule weekly cleanup (keep 30 days of data)
+	c.AddFunc("@weekly", func() {
+		if err := cleanupService.CleanupOldStatuses(30); err != nil {
+			fmt.Printf("⚠️ Failed to cleanup old statuses: %v\n", err)
+		}
+		if err := cleanupService.CleanupOrphanedStatuses(storageService.GetWebsitesCollection()); err != nil {
+			fmt.Printf("⚠️ Failed to cleanup orphaned statuses: %v\n", err)
 		}
 	})
 

@@ -192,5 +192,15 @@ func (s *StorageService) DeleteWebsite(id string) error {
 	return nil
 }
 
+// GetStatusesCollection returns the statuses collection for cleanup service
+func (s *StorageService) GetStatusesCollection() *mongo.Collection {
+	return s.statusesColl
+}
+
+// GetWebsitesCollection returns the websites collection for cleanup service
+func (s *StorageService) GetWebsitesCollection() *mongo.Collection {
+	return s.websitesColl
+}
+
 // --- The original JSON-specific file methods are now removed ---
 // saveWebsitesToFile() and saveStatusesToFile() are no longer part of this StorageService.
