@@ -377,6 +377,7 @@ function App() {
                 setShowDeleteModal(true);
               }}
               totalCount={websites.length}
+              statusesByWebsite={statusesByWebsite}
             />
           </div>
 

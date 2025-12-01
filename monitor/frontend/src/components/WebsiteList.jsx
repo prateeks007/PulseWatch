@@ -3,6 +3,7 @@ import { ThemeContext } from "../context/ThemeContext";
 import { MoreVertical } from "lucide-react";
 import StatusIndicator, { StatusDot } from "./StatusIndicator";
 import UptimeBadge from "./UptimeBadge";
+import MiniChart from "./MiniChart";
 
 function getFavicon(url) {
   try {
@@ -13,7 +14,7 @@ function getFavicon(url) {
   }
 }
 
-export default function WebsiteList({ websites, selectedWebsite, onSelect, onDelete, totalCount }) {
+export default function WebsiteList({ websites, selectedWebsite, onSelect, onDelete, totalCount, statusesByWebsite = {} }) {
   const { darkMode } = useContext(ThemeContext);
   const [menuOpen, setMenuOpen] = useState(null);
   
@@ -95,8 +96,8 @@ export default function WebsiteList({ websites, selectedWebsite, onSelect, onDel
                   className="h-5 w-5 rounded-sm"
                   loading="lazy"
                 />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                <div className="flex-1 min-w-0 pr-8"> {/* Add right padding to avoid menu overlap */}
+                  <div className="mb-1">
                     <div
                       className={
                         darkMode
@@ -106,20 +107,23 @@ export default function WebsiteList({ websites, selectedWebsite, onSelect, onDel
                     >
                       {w.name}
                     </div>
-                    <StatusDot status={statusValue} size="sm" />
                   </div>
                   <div
                     className={
                       darkMode
-                        ? "text-xs text-gray-400 truncate"
-                        : "text-xs text-gray-500 truncate"
+                        ? "text-xs text-gray-400 truncate mb-2"
+                        : "text-xs text-gray-500 truncate mb-2"
                     }
                   >
                     {w.url}
                   </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <StatusIndicator status={statusValue} size="xs" showText={true} />
+                  <div className="flex items-center justify-between">
                     <UptimeBadge percentage={w.uptimePercentage || 0} size="xs" />
+                    <MiniChart 
+                      data={statusesByWebsite[w.id] || []} 
+                      height={32} 
+                      width={100} 
+                    />
                   </div>
                 </div>
               </button>
