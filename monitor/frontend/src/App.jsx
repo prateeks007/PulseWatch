@@ -29,6 +29,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({ status: 'all', maxResponseTime: null });
+  const [searchTerm, setSearchTerm] = useState(''); // New search state
   const [showSummary, setShowSummary] = useState(true);
   const [rangeHours, setRangeHours] = useState(3);
 
@@ -212,27 +213,39 @@ function App() {
   };
 
   const filteredWebsites = useMemo(() => {
-    if (filters.status === 'all' && (filters.maxResponseTime === null || filters.maxResponseTime <= 0)) {
-      return websites;
+    let filtered = websites;
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter((website) => 
+        website.name.toLowerCase().includes(searchLower) ||
+        website.url.toLowerCase().includes(searchLower)
+      );
     }
 
-    return websites.filter((website) => {
-      if (filters.status !== 'all') {
-        if (filters.status === 'online' && website.lastStatus !== true) return false;
-        if (filters.status === 'offline' && website.lastStatus !== false) return false;
-        if (filters.status === 'unknown' && (website.lastStatus === true || website.lastStatus === false)) return false;
-      }
-
-      if (filters.maxResponseTime && filters.maxResponseTime > 0 && statuses.length > 0) {
-        const relevantStatus = statuses.find((status) => status.website_id === website.id);
-        if (relevantStatus && relevantStatus.response_time_ms > filters.maxResponseTime) {
-          return false;
+    // Apply status and response time filters
+    if (filters.status !== 'all' || (filters.maxResponseTime && filters.maxResponseTime > 0)) {
+      filtered = filtered.filter((website) => {
+        if (filters.status !== 'all') {
+          if (filters.status === 'online' && website.lastStatus !== true) return false;
+          if (filters.status === 'offline' && website.lastStatus !== false) return false;
+          if (filters.status === 'unknown' && (website.lastStatus === true || website.lastStatus === false)) return false;
         }
-      }
 
-      return true;
-    });
-  }, [websites, filters, statuses]);
+        if (filters.maxResponseTime && filters.maxResponseTime > 0 && statuses.length > 0) {
+          const relevantStatus = statuses.find((status) => status.website_id === website.id);
+          if (relevantStatus && relevantStatus.response_time_ms > filters.maxResponseTime) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [websites, searchTerm, filters, statuses]);
 
   useEffect(() => {
     if (filteredWebsites.length === 0) {
@@ -345,7 +358,7 @@ function App() {
           />
         )}
 
-        <FilterBar filters={filters} setFilters={handleFilterChange} />
+        <FilterBar filters={filters} setFilters={handleFilterChange} searchTerm={searchTerm} onSearch={setSearchTerm} />
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="md:col-span-1">
@@ -357,6 +370,7 @@ function App() {
                 setWebsiteToDelete(w);
                 setShowDeleteModal(true);
               }}
+              totalCount={websites.length}
             />
           </div>
 

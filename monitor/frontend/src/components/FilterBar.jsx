@@ -1,7 +1,8 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { ThemeContext } from '../context/ThemeContext';
+import SearchBar from './SearchBar';
 
-function FilterBar({ filters, setFilters }) {
+function FilterBar({ filters, setFilters, searchTerm, onSearch }) {
   const { darkMode } = useContext(ThemeContext);
   // Explicitly initialize local state from props
   const [localFilters, setLocalFilters] = useState({
@@ -62,6 +63,12 @@ function FilterBar({ filters, setFilters }) {
 
   return (
     <div className={`${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'} rounded-lg shadow p-4 mb-6 transition-colors duration-200`}>
+      {/* Search Bar */}
+      <SearchBar 
+        onSearch={onSearch} 
+        placeholder="Search websites by name or URL..." 
+      />
+      
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div>

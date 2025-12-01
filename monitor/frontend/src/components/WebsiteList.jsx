@@ -13,9 +13,12 @@ function getFavicon(url) {
   }
 }
 
-export default function WebsiteList({ websites, selectedWebsite, onSelect, onDelete }) {
+export default function WebsiteList({ websites, selectedWebsite, onSelect, onDelete, totalCount }) {
   const { darkMode } = useContext(ThemeContext);
   const [menuOpen, setMenuOpen] = useState(null);
+  
+  const showingCount = websites?.length || 0;
+  const total = totalCount || showingCount;
 
   const containerCls = [
     "rounded-2xl p-4 shadow-xl ring-1",
@@ -32,12 +35,23 @@ export default function WebsiteList({ websites, selectedWebsite, onSelect, onDel
           darkMode ? "text-white font-semibold mb-3" : "text-gray-900 font-semibold mb-3"
         }
       >
-        Monitored Websites ({websites?.length || 0})
+        Monitored Websites  
+        {showingCount !== total ? (
+          <span className="text-sm font-normal text-gray-400">({showingCount} of {total})</span>
+        ) : (
+          <span className="text-sm font-normal text-gray-400">({total})</span>
+        )}
       </div>
 
       {(!websites || websites.length === 0) && (
         <div className="text-center py-10 text-sm text-gray-400">
-          No websites added yet.
+          <div className="mb-2">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <p className="font-medium">No websites found</p>
+          <p className="text-xs mt-1">Try adjusting your search or filters</p>
         </div>
       )}
 
