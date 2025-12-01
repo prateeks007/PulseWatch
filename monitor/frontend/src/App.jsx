@@ -163,9 +163,15 @@ function App() {
       // Refresh full list in background (to pull computed fields)
       fetchWebsites();
     } catch (err) {
-      console.error('Add website failed:', err);
-      addToast('Failed to add website ❌', 'error');
-      throw err;
+      // Check if it's a validation error from backend
+      if (err.response?.status === 400 && err.response?.data?.validation_errors) {
+        // Let the modal handle validation errors
+        throw err;
+      } else {
+        // Show generic error toast for other errors
+        addToast('Failed to add website ❌', 'error');
+        throw err;
+      }
     }
   };
 
@@ -407,8 +413,13 @@ function App() {
           try {
             await addWebsite(data);
             setShowAddModal(false);
-          } catch {
-            // toast already shown in addWebsite
+          } catch (error) {
+            // Only close modal on success, let modal handle validation errors
+            if (error.response?.status === 400 && error.response?.data?.validation_errors) {
+              // Re-throw validation errors so modal can display them
+              throw error;
+            }
+            // For other errors, toast was already shown in addWebsite
           }
         }}
       />

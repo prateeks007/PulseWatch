@@ -7,6 +7,7 @@ import (
 
 	"github.com/prateeks007/PulseWatch/monitor/backend/models"
 	"github.com/prateeks007/PulseWatch/monitor/backend/services"
+	"github.com/prateeks007/PulseWatch/monitor/backend/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -280,7 +281,37 @@ func main() {
 	app.Post("/api/websites", func(c *fiber.Ctx) error {
 		var website models.Website
 		if err := c.BodyParser(&website); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Invalid request body",
+				"details": err.Error(),
+			})
+		}
+
+		// Validate input data
+		if validationErrors := utils.ValidateWebsite(website.Name, website.URL); len(validationErrors) > 0 {
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Validation failed",
+				"validation_errors": validationErrors,
+			})
+		}
+
+		// Check for duplicate URL (using normalized URLs)
+		existingWebsites, err := storageService.GetWebsites()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to check existing websites"})
+		}
+		normalizedNewURL := utils.NormalizeURL(website.URL)
+		for _, existing := range existingWebsites {
+			normalizedExistingURL := utils.NormalizeURL(existing.URL)
+			if normalizedExistingURL == normalizedNewURL {
+				return c.Status(400).JSON(fiber.Map{
+					"error": "Validation failed",
+					"validation_errors": []utils.ValidationError{{
+						Field:   "url",
+						Message: fmt.Sprintf("A website with this URL already exists: %s", existing.Name),
+					}},
+				})
+			}
 		}
 
 		// Generate ID if missing
