@@ -388,6 +388,91 @@ func main() {
 		return c.JSON(fiber.Map{"success": true})
 	})
 
+	// === PUBLIC STATUS PAGE ENDPOINTS ===
+	// These endpoints are public (no auth required) for status pages
+
+	// Get public status overview
+	app.Get("/api/public/status", func(c *fiber.Ctx) error {
+		websites, err := storageService.GetWebsites()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites"})
+		}
+
+		type PublicWebsiteStatus struct {
+			ID           string  `json:"id"`
+			Name         string  `json:"name"`
+			URL          string  `json:"url"`
+			IsUp         *bool   `json:"is_up"`
+			ResponseTime *int64  `json:"response_time_ms"`
+			LastChecked  *int64  `json:"last_checked"`
+			Uptime24h    float64 `json:"uptime_24h"`
+			Uptime7d     float64 `json:"uptime_7d"`
+		}
+
+		var publicStatuses []PublicWebsiteStatus
+		allUp := true
+
+		for _, website := range websites {
+			// Get latest status
+			statuses, err := storageService.GetWebsiteStatuses(website.ID)
+			if err != nil || len(statuses) == 0 {
+				publicStatuses = append(publicStatuses, PublicWebsiteStatus{
+					ID:   website.ID,
+					Name: website.Name,
+					URL:  website.URL,
+				})
+				allUp = false
+				continue
+			}
+
+			latest := statuses[0]
+			if !latest.IsUp {
+				allUp = false
+			}
+
+			// Calculate uptime percentages
+			uptime24h := calculateUptimePercentage(statuses, 24*60) // 24 hours in minutes
+			uptime7d := calculateUptimePercentage(statuses, 7*24*60) // 7 days in minutes
+
+			publicStatuses = append(publicStatuses, PublicWebsiteStatus{
+				ID:           website.ID,
+				Name:         website.Name,
+				URL:          website.URL,
+				IsUp:         &latest.IsUp,
+				ResponseTime: &latest.ResponseTime,
+				LastChecked:  &latest.CheckedAt,
+				Uptime24h:    uptime24h,
+				Uptime7d:     uptime7d,
+			})
+		}
+
+		return c.JSON(fiber.Map{
+			"overall_status": map[string]interface{}{
+				"all_up":     allUp,
+				"status":     func() string { if allUp { return "operational" } else { return "degraded" } }(),
+				"updated_at": time.Now().Unix(),
+			},
+			"services": publicStatuses,
+		})
+	})
+
+	// Get public status for a specific website
+	app.Get("/api/public/status/:id", func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		statuses, err := storageService.GetWebsiteStatuses(id)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch status history"})
+		}
+
+		// Return last 48 hours of data for public view
+		limit := 48 * 60 // 48 hours worth of minute-by-minute data
+		if len(statuses) > limit {
+			statuses = statuses[:limit]
+		}
+
+		return c.JSON(statuses)
+	})
+
 	// Start the API server in a separate goroutine
 	go func() {
 		port := os.Getenv("PORT")
@@ -427,4 +512,30 @@ func startKeepAlive() {
 			}
 		}
 	}()
+}
+
+// Helper function to calculate uptime percentage
+func calculateUptimePercentage(statuses []models.WebsiteStatus, minutes int) float64 {
+	if len(statuses) == 0 {
+		return 0.0
+	}
+
+	cutoffTime := time.Now().Add(-time.Duration(minutes) * time.Minute).Unix()
+	upCount := 0
+	totalCount := 0
+
+	for _, status := range statuses {
+		if status.CheckedAt >= cutoffTime {
+			totalCount++
+			if status.IsUp {
+				upCount++
+			}
+		}
+	}
+
+	if totalCount == 0 {
+		return 0.0
+	}
+
+	return (float64(upCount) / float64(totalCount)) * 100.0
 }

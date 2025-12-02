@@ -333,6 +333,18 @@ function App() {
             <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Monitor your websites in real-time</p>
           </div>
           <div className="flex space-x-4 items-center">
+            <a
+              href="/status"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                darkMode
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-200'
+              }`}
+            >
+              📊 Status Page
+            </a>
             <button
               className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
                 darkMode ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'
