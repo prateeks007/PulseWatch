@@ -7,3 +7,5 @@ dist/
 
 # Configuration and Secrets
 .env
+.env.local
+monitor/frontend/.env.local
