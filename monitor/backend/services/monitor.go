@@ -54,8 +54,8 @@ func (s *MonitorService) CheckWebsite(website models.Website) (models.WebsiteSta
 	if err != nil {
 		status.IsUp = false
 		status.StatusCode = 0
-		// 👇 log for debug
-		fmt.Printf("[DEBUG] %s failed, respTime=%dms\n", website.URL, responseTime)
+		// 👇 log for debug with detailed error
+		fmt.Printf("[DEBUG] %s FAILED, respTime=%dms, error: %v\n", website.URL, responseTime, err)
 		return status, err
 	}
 	defer resp.Body.Close() // Always close the response

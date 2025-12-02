@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -176,6 +177,9 @@ func main() {
 	// Start the cron scheduler
 	c.Start()
 
+	// Start keep-alive service for Render free tier
+	go startKeepAlive()
+
 	// Create a fiber app for the REST API
 	app := fiber.New()
 
@@ -189,6 +193,15 @@ func main() {
 	// Define API routes
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.SendString("Website Monitor API is running!")
+	})
+
+	// Health check endpoint for keep-alive
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status": "ok",
+			"time": time.Now(),
+			"uptime": time.Since(time.Now()).String(),
+		})
 	})
 
 	// Get all websites
@@ -393,4 +406,25 @@ func main() {
 
 	// Keep the program running
 	select {}
+}
+
+// Keep-alive function to prevent Render free tier spin-down
+func startKeepAlive() {
+	serviceURL := os.Getenv("RENDER_EXTERNAL_URL")
+	if serviceURL == "" {
+		serviceURL = "https://pulsewatch-av56.onrender.com" // Replace with your actual URL
+	}
+
+	ticker := time.NewTicker(10 * time.Minute)
+	go func() {
+		for range ticker.C {
+			resp, err := http.Get(serviceURL + "/health")
+			if err != nil {
+				fmt.Printf("⚠️ Keep-alive ping failed: %v\n", err)
+			} else {
+				resp.Body.Close()
+				fmt.Printf("💓 Keep-alive ping successful at %v\n", time.Now())
+			}
+		}
+	}()
 }
