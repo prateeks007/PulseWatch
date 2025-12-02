@@ -11,13 +11,15 @@ import DeleteConfirmModal from './components/DeleteConfirmModal';
 import LoadingSkeleton from './components/LoadingSkeleton';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeContext } from './context/ThemeContext';
+import { useAuth } from './context/AuthContext';
 import { useToast } from './components/ToastProvider';
 import { debounce } from 'lodash';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw, User, LogOut } from 'lucide-react';
 import { calculateUptimePercentage } from './utils/uptimeCalculator';
 
 function App() {
   const { darkMode } = useContext(ThemeContext);
+  const { user, signOut, getToken } = useAuth();
   const { addToast } = useToast();
 
   const [websites, setWebsites] = useState([]);
@@ -51,7 +53,11 @@ function App() {
   // ---------- API helpers ----------
   const fetchWebsites = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/websites`);
+      // Get JWT token for authentication
+      const token = await getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get(`${API_BASE_URL}/api/websites`, { headers });
 
       const latestStatuses = [];
       const nextStatusesByWebsite = {};
@@ -134,7 +140,11 @@ function App() {
 
   const fetchStatuses = async (websiteId) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/websites/${websiteId}/status`);
+      // Get JWT token for authentication
+      const token = getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get(`${API_BASE_URL}/api/websites/${websiteId}/status`, { headers });
       setStatuses(response.data);
     } catch (err) {
       console.error(`Error fetching statuses for website ${websiteId}:`, err);
@@ -143,9 +153,13 @@ function App() {
 
   const addWebsite = async ({ name, url }) => {
     try {
+      // Get JWT token for authentication
+      const token = getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
       // Basic normalization: ensure URL has protocol
       const normalizedUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
-      const res = await axios.post(`${API_BASE_URL}/api/websites`, { name, url: normalizedUrl });
+      const res = await axios.post(`${API_BASE_URL}/api/websites`, { name, url: normalizedUrl }, { headers });
       const created = res.data; // expect { id, name, url, ... }
 
       addToast('Website added ✅', 'success');
@@ -177,7 +191,11 @@ function App() {
 
   const deleteWebsite = async (website) => {
     try {
-      await axios.delete(`${API_BASE_URL}/api/websites/${website.id}`);
+      // Get JWT token for authentication
+      const token = getToken();
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      await axios.delete(`${API_BASE_URL}/api/websites/${website.id}`, { headers });
       // Update UI
       setWebsites((prev) => prev.filter((w) => w.id !== website.id));
       setStatusesByWebsite((prev) => {
@@ -363,7 +381,32 @@ function App() {
             >
               {showSummary ? 'Hide Summary' : 'Show Summary'}
             </button>
-            <ThemeToggle />
+            
+            {/* User Profile */}
+            <div className="flex items-center space-x-3">
+              <div className={`flex items-center space-x-2 px-3 py-2 rounded ${
+                darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'
+              }`}>
+                <User className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  {user?.email?.split('@')[0] || 'User'}
+                </span>
+              </div>
+              
+              <button
+                onClick={signOut}
+                className={`p-2 rounded text-sm font-medium transition-colors ${
+                  darkMode
+                    ? 'bg-red-600 hover:bg-red-500 text-white'
+                    : 'bg-red-500 hover:bg-red-600 text-white'
+                }`}
+                title="Sign Out"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+              
+              <ThemeToggle />
+            </div>
           </div>
         </header>
 
