@@ -23,6 +23,13 @@ PulseWatch is a professional-grade website uptime and health monitoring platform
 * 🔍 **Search & filtering** - Find websites quickly with advanced filters
 * 📱 **Mobile responsive** - Works perfectly on all devices
 
+### **Authentication & Security**
+* 🔐 **JWT authentication** - Secure user sessions with Supabase
+* 👥 **Multi-user support** - Each user sees only their websites
+* 🛡️ **Protected admin APIs** - JWT validation on all admin endpoints
+* 🌐 **Public status pages** - No authentication required for status viewing
+* 🔒 **User data isolation** - Complete separation between user accounts
+
 ### **Public Status Pages**
 * 🌐 **Professional status pages** - Public-facing status like GitHub/Vercel
 * 🎨 **Stunning animations** - 3D effects, gradients, and smooth transitions
@@ -85,7 +92,7 @@ MONGO_DB_NAME="pulsewatch_db_local"  # Use different names for local/prod
 
 # Supabase Authentication
 SUPABASE_URL="https://your-project.supabase.co"
-SUPABASE_SERVICE_KEY="your-service-role-key"
+SUPABASE_JWT_SECRET="your-jwt-secret-from-supabase-settings"
 
 # Discord Notifications (Optional)
 DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/your-webhook-url"
@@ -176,10 +183,10 @@ Production:         MongoDB "pulsewatch_db_prod"   + Supabase Cloud Auth
 * ~~Real-time updates~~ ✅ **DONE**
 * ~~Data cleanup and retention~~ ✅ **DONE**
 * ~~Production deployment~~ ✅ **DONE**
+* ~~User authentication (Supabase integration)~~ ✅ **DONE**
+* ~~Multi-tenant architecture~~ ✅ **DONE**
 
 ### **🚧 In Progress**
-* User authentication (Supabase integration)
-* Multi-tenant architecture
 * Custom status page domains
 
 ### **📋 Future Plans**
