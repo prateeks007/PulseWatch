@@ -63,9 +63,9 @@ function App() {
       const nextStatusesByWebsite = {};
 
       const websitesWithStatus = await Promise.all(
-        response.data.map(async (website) => {
+        (response.data || []).map(async (website) => {
           try {
-            const statusResponse = await axios.get(`${API_BASE_URL}/api/websites/${website.id}/status`);
+            const statusResponse = await axios.get(`${API_BASE_URL}/api/websites/${website.id}/status`, { headers });
             if (statusResponse.data && statusResponse.data.length > 0) {
               const latest = statusResponse.data[0];
               latestStatuses.push(latest);
@@ -140,10 +140,8 @@ function App() {
 
   const fetchStatuses = async (websiteId) => {
     try {
-      // Get JWT token for authentication
-      const token = getToken();
+      const token = await getToken();
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
       const response = await axios.get(`${API_BASE_URL}/api/websites/${websiteId}/status`, { headers });
       setStatuses(response.data);
     } catch (err) {
@@ -153,11 +151,8 @@ function App() {
 
   const addWebsite = async ({ name, url }) => {
     try {
-      // Get JWT token for authentication
-      const token = getToken();
+      const token = await getToken();
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
-      // Basic normalization: ensure URL has protocol
       const normalizedUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
       const res = await axios.post(`${API_BASE_URL}/api/websites`, { name, url: normalizedUrl }, { headers });
       const created = res.data; // expect { id, name, url, ... }
@@ -191,10 +186,8 @@ function App() {
 
   const deleteWebsite = async (website) => {
     try {
-      // Get JWT token for authentication
-      const token = getToken();
+      const token = await getToken();
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
       await axios.delete(`${API_BASE_URL}/api/websites/${website.id}`, { headers });
       // Update UI
       setWebsites((prev) => prev.filter((w) => w.id !== website.id));

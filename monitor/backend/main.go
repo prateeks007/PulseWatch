@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/joho/godotenv"
+	"github.com/prateeks007/PulseWatch/monitor/backend/middleware"
 	"github.com/prateeks007/PulseWatch/monitor/backend/models"
 	"github.com/prateeks007/PulseWatch/monitor/backend/services"
 	"github.com/prateeks007/PulseWatch/monitor/backend/utils"
@@ -16,6 +18,9 @@ import (
 )
 
 func main() {
+	// Load environment variables
+	_ = godotenv.Load()
+	
 	// Initialize services
 	storageService, err := services.NewStorageService()
 	if err != nil {
@@ -204,8 +209,8 @@ func main() {
 		})
 	})
 
-	// Get all websites
-	app.Get("/api/websites", func(c *fiber.Ctx) error {
+	// Get all websites (protected)
+	app.Get("/api/websites", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
 		websites, err := storageService.GetWebsites()
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites", "details": err.Error()})
@@ -213,8 +218,8 @@ func main() {
 		return c.JSON(websites)
 	})
 
-	// Get website by ID
-	app.Get("/api/websites/:id", func(c *fiber.Ctx) error {
+	// Get website by ID (protected)
+	app.Get("/api/websites/:id", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
 		id := c.Params("id")
 		websites, err := storageService.GetWebsites()
 		if err != nil {
@@ -230,8 +235,8 @@ func main() {
 		return c.Status(404).JSON(fiber.Map{"error": "Website not found"})
 	})
 
-	// Get SSL info for a website (cached; computes on first request)
-	app.Get("/api/websites/:id/ssl", func(c *fiber.Ctx) error {
+	// Get SSL info for a website (protected)
+	app.Get("/api/websites/:id/ssl", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
 		id := c.Params("id")
 		// find website
 		websites, err := storageService.GetWebsites()
@@ -264,8 +269,8 @@ func main() {
 		return c.JSON(info)
 	})
 
-	// Get SSL summary (earliest expiry)
-	app.Get("/api/ssl/summary", func(c *fiber.Ctx) error {
+	// Get SSL summary (protected)
+	app.Get("/api/ssl/summary", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
 		sites, err := storageService.GetWebsites()
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites", "details": err.Error()})
@@ -288,14 +293,14 @@ func main() {
 
 		return c.JSON(fiber.Map{
 			"website_id": soonestSite.ID,
-			"name":       soonestSite.Name, // ✅ just the string, not the whole struct
+			"name":       soonestSite.Name,
 			"valid_to":   soonest.ValidTo,
 			"days_left":  int(time.Until(time.Unix(soonest.ValidTo, 0)).Hours() / 24),
 		})
 	})
 
-	// Get status history for a website
-	app.Get("/api/websites/:id/status", func(c *fiber.Ctx) error {
+	// Get status history for a website (protected)
+	app.Get("/api/websites/:id/status", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
 		id := c.Params("id")
 		statuses, err := storageService.GetWebsiteStatuses(id)
 		if err != nil {
@@ -319,8 +324,8 @@ func main() {
 		return c.JSON(formattedStatuses)
 	})
 
-	// Add a new website
-	app.Post("/api/websites", func(c *fiber.Ctx) error {
+	// Add a new website (protected)
+	app.Post("/api/websites", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
 		var website models.Website
 		if err := c.BodyParser(&website); err != nil {
 			return c.Status(400).JSON(fiber.Map{
@@ -379,8 +384,8 @@ func main() {
 		return c.Status(201).JSON(website)
 	})
 
-	// Delete a website
-	app.Delete("/api/websites/:id", func(c *fiber.Ctx) error {
+	// Delete a website (protected)
+	app.Delete("/api/websites/:id", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
 		id := c.Params("id")
 		if err := storageService.DeleteWebsite(id); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to delete website"})

@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useContext } from "react";
 import axios from "axios";
 import { ThemeContext } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function SSLCard({ website }) {
   const { darkMode } = useContext(ThemeContext);
+  const { getToken } = useAuth();
   const [ssl, setSsl] = useState(null);
   const [error, setError] = useState(null);
 
@@ -11,12 +13,21 @@ export default function SSLCard({ website }) {
 
   useEffect(() => {
     if (!website?.id) return;
-    setError(null);
-    axios
-      .get(`${API_BASE_URL}/api/websites/${website.id}/ssl`)
-      .then((res) => setSsl(res.data))
-      .catch((err) => setError(err?.response?.data?.error || "Failed to load SSL"));
-  }, [website?.id]);
+    
+    const fetchSSL = async () => {
+      try {
+        setError(null);
+        const token = await getToken();
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await axios.get(`${API_BASE_URL}/api/websites/${website.id}/ssl`, { headers });
+        setSsl(res.data);
+      } catch (err) {
+        setError(err?.response?.data?.error || "Failed to load SSL");
+      }
+    };
+    
+    fetchSSL();
+  }, [website?.id, getToken]);
 
   const cardCls = [
     "rounded-xl p-4 shadow ring-1",
