@@ -16,7 +16,8 @@ import { ThemeContext } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './components/ToastProvider';
 import { debounce } from 'lodash';
-import { AlertTriangle, RefreshCw, User, LogOut } from 'lucide-react';
+import { AlertTriangle, RefreshCw, User, LogOut, Settings, BarChart3 } from 'lucide-react';
+import DropdownMenu, { DropdownItem } from './components/DropdownMenu';
 import { calculateUptimePercentage } from './utils/uptimeCalculator';
 
 function App() {
@@ -34,7 +35,7 @@ function App() {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({ status: 'all', maxResponseTime: null });
   const [searchTerm, setSearchTerm] = useState(''); // New search state
-  const [showSummary, setShowSummary] = useState(true);
+  const [showSummary, setShowSummary] = useState(false);
   const [rangeHours, setRangeHours] = useState(3);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -365,24 +366,13 @@ function App() {
             <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>PulseWatch</h1>
             <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Monitor your websites in real-time</p>
           </div>
-          <div className="flex space-x-4 items-center">
-            <a
-              href="/status"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                darkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                  : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-200'
-              }`}
-            >
-              📊 Status Page
-            </a>
+          <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
+            {/* Primary Action - Always Visible */}
             <div className="flex items-center space-x-2">
-              <span className={`text-xs ${
+              <span className={`text-xs hidden sm:block ${
                 darkMode ? 'text-gray-400' : 'text-gray-500'
               }`}>
-                {websites.length}/30 websites
+                {websites.length}/30
               </span>
               <button
                 className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
@@ -397,53 +387,46 @@ function App() {
                 + Add Website
               </button>
             </div>
-            <button
-              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                darkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                  : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-200'
-              }`}
-              onClick={toggleSummary}
-            >
-              {showSummary ? 'Hide Summary' : 'Show Summary'}
-            </button>
-            
-            <button
-              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                darkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                  : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-200'
-              }`}
-              onClick={() => setShowDiscordSettings(!showDiscordSettings)}
-            >
-              🔔 Discord Alerts
-            </button>
-            
-            {/* User Profile */}
-            <div className="flex items-center space-x-3">
-              <div className={`flex items-center space-x-2 px-3 py-2 rounded ${
-                darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'
-              }`}>
-                <User className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  {user?.email?.split('@')[0] || 'User'}
-                </span>
-              </div>
-              
-              <button
-                onClick={signOut}
-                className={`p-2 rounded text-sm font-medium transition-colors ${
-                  darkMode
-                    ? 'bg-red-600 hover:bg-red-500 text-white'
-                    : 'bg-red-500 hover:bg-red-600 text-white'
-                }`}
-                title="Sign Out"
+
+            {/* Settings Dropdown */}
+            <DropdownMenu trigger={<><Settings className="w-4 h-4" /><span className="hidden sm:inline">Settings</span></>}>
+              <DropdownItem 
+                onClick={toggleSummary}
+                icon={BarChart3}
               >
-                <LogOut className="h-4 w-4" />
-              </button>
-              
-              <ThemeToggle />
-            </div>
+                {showSummary ? 'Hide Summary' : 'Show Summary'}
+              </DropdownItem>
+              <DropdownItem 
+                onClick={() => setShowDiscordSettings(!showDiscordSettings)}
+                icon={() => <span className="text-sm">🔔</span>}
+              >
+                Discord Alerts
+              </DropdownItem>
+              <DropdownItem 
+                onClick={() => window.open('/status', '_blank')}
+                icon={() => <span className="text-sm">📊</span>}
+              >
+                Status Page
+              </DropdownItem>
+            </DropdownMenu>
+
+            {/* Profile Dropdown */}
+            <DropdownMenu trigger={<><User className="w-4 h-4" /><span className="hidden sm:inline">{user?.email?.split('@')[0] || 'User'}</span></>}>
+              <div className={`px-4 py-2 text-xs border-b ${
+                darkMode ? 'text-gray-400 border-gray-700' : 'text-gray-500 border-gray-200'
+              }`}>
+                {user?.email}
+              </div>
+              <DropdownItem 
+                onClick={signOut}
+                icon={LogOut}
+              >
+                Sign Out
+              </DropdownItem>
+            </DropdownMenu>
+
+            {/* Theme Toggle - Always Visible */}
+            <ThemeToggle />
           </div>
         </header>
 
