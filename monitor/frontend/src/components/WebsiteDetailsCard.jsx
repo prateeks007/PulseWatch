@@ -1,5 +1,6 @@
 // src/components/WebsiteDetailsCard.jsx
-import React, { useContext, useMemo } from "react";
+import React, { useContext, useMemo, useState } from "react";
+import { Copy, Check } from "lucide-react";
 import { ThemeContext } from "../context/ThemeContext";
 import TimeRangeToggle from "./TimeRangeToggle";
 import StatusChart from "./StatusChart";
@@ -12,6 +13,17 @@ export default function WebsiteDetailsCard({
   onChangeRangeHours,
 }) {
   const { darkMode } = useContext(ThemeContext);
+  const [copied, setCopied] = useState(false);
+
+  const copyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(website?.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy URL:', err);
+    }
+  };
 
   const safeStatuses = Array.isArray(statuses) ? statuses.filter(Boolean) : [];
 
@@ -71,9 +83,26 @@ export default function WebsiteDetailsCard({
   return (
     <div className={cardCls}>
       <div className="flex items-center justify-between mb-2">
-        <div>
+        <div className="flex-1 min-w-0">
           <h2 className={titleCls}>{website?.name}</h2>
-          <p className={subtitleCls}>{website?.url}</p>
+          <div className="flex items-center gap-2">
+            <p className={`${subtitleCls} truncate`}>{website?.url}</p>
+            <button
+              onClick={copyUrl}
+              className={`p-1.5 rounded-md transition-colors ${
+                darkMode 
+                  ? 'hover:bg-gray-700 text-gray-400 hover:text-white' 
+                  : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700'
+              }`}
+              title="Copy URL"
+            >
+              {copied ? (
+                <Check className="w-4 h-4 text-green-500" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <span
