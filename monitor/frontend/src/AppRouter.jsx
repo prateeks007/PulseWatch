@@ -4,6 +4,7 @@ import App from './App';
 import StatusPage from './components/StatusPage';
 import AuthPage from './components/Auth/AuthPage';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
+import SettingsPage from './components/Settings/SettingsPage';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './components/ToastProvider';
 import { AuthProvider } from './context/AuthContext';
@@ -27,6 +28,11 @@ function AppRouter() {
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <App />
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <SettingsPage />
                 </ProtectedRoute>
               } />
               

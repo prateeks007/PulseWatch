@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import WebsiteList from './components/WebsiteList';
 import ThemeToggle from './components/ThemeToggle';
 import FilterBar from './components/FilterBar';
@@ -24,6 +25,7 @@ function App() {
   const { darkMode } = useContext(ThemeContext);
   const { user, signOut, getToken } = useAuth();
   const { addToast } = useToast();
+  const navigate = useNavigate();
 
   const [websites, setWebsites] = useState([]);
   const [selectedWebsite, setSelectedWebsite] = useState(null);
@@ -41,7 +43,7 @@ function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [websiteToDelete, setWebsiteToDelete] = useState(null);
-  const [showDiscordSettings, setShowDiscordSettings] = useState(false);
+
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
@@ -397,10 +399,10 @@ function App() {
                 {showSummary ? 'Hide Summary' : 'Show Summary'}
               </DropdownItem>
               <DropdownItem 
-                onClick={() => setShowDiscordSettings(!showDiscordSettings)}
-                icon={() => <span className="text-sm">🔔</span>}
+                onClick={() => navigate('/settings')}
+                icon={() => <span className="text-sm">⚙️</span>}
               >
-                Discord Alerts
+                Preferences
               </DropdownItem>
               <DropdownItem 
                 onClick={() => window.open('/status', '_blank')}
@@ -437,12 +439,6 @@ function App() {
             statusesByWebsite={statusesByWebsite}
             rangeHours={rangeHours}
           />
-        )}
-
-        {showDiscordSettings && (
-          <div className="mb-8">
-            <UserSettings />
-          </div>
         )}
 
         {websites.length > 1 && (
