@@ -108,8 +108,8 @@ export const AuthProvider = ({ children }) => {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
       
-      // Redirect to auth page after successful logout
-      window.location.href = '/auth'
+      // Redirect to home page after successful logout
+      window.location.href = '/'
     } catch (error) {
       console.error('Sign out error:', error)
     } finally {
