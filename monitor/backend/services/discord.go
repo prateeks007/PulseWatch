@@ -27,6 +27,14 @@ func (d *DiscordService) SendAlert(website models.Website, isUp bool, responseTi
 	if d.webhookURL == "" {
 		return nil // Skip if no webhook configured
 	}
+	return d.SendAlertToWebhook(d.webhookURL, website, isUp, responseTime)
+}
+
+// SendAlertToWebhook sends alert to a specific webhook URL
+func (d *DiscordService) SendAlertToWebhook(webhookURL string, website models.Website, isUp bool, responseTime int64) error {
+	if webhookURL == "" {
+		return nil // Skip if no webhook configured
+	}
 
 	var color int
 	var status string
@@ -58,7 +66,7 @@ func (d *DiscordService) SendAlert(website models.Website, isUp bool, responseTi
 		return fmt.Errorf("failed to marshal Discord payload: %w", err)
 	}
 
-	resp, err := d.client.Post(d.webhookURL, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := d.client.Post(webhookURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to send Discord webhook: %w", err)
 	}

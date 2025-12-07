@@ -1,5 +1,21 @@
 # PulseWatch
 
+## 🚀 **Use the hosted version (no setup required):** 
+### **[https://pulse-watch.vercel.app](https://pulse-watch.vercel.app)**
+
+**Free uptime & status monitoring. Sign up → Add your first site → Get alerts.**
+
+### How it works:
+1. **Sign up** - Create your free account
+2. **Add websites** - Monitor your sites and APIs  
+3. **Get alerts** - Discord notifications when sites go down
+
+---
+
+**Or self-host using the instructions below.**
+
+---
+
 PulseWatch is a professional-grade website uptime and health monitoring platform built with Go and React. Monitor multiple websites, track performance metrics, and get instant alerts when issues occur. Features a stunning dashboard and public status pages that rival industry leaders like GitHub Status and Vercel Status.
 
 ## 🚀 Features
@@ -200,11 +216,11 @@ Production:         MongoDB "pulsewatch_db_prod"   + Supabase Cloud Auth
 
 -----
 
-## 🌐 **Live Demo**
+## 🌐 **Try PulseWatch Now**
 
-* **Admin Dashboard**: [https://pulse-watch.vercel.app](https://pulse-watch.vercel.app)
-* **Public Status Page**: [https://pulse-watch.vercel.app/status](https://pulse-watch.vercel.app/status)
-* **Backend API**: [https://pulsewatch-av56.onrender.com](https://pulsewatch-av56.onrender.com)
+* **📊 Start Monitoring**: [https://pulse-watch.vercel.app](https://pulse-watch.vercel.app) - Sign up and add your first website
+* **📄 Example Status Page**: [https://pulse-watch.vercel.app/status](https://pulse-watch.vercel.app/status) - See what your customers will see
+* **🔗 API Endpoint**: [https://pulsewatch-av56.onrender.com](https://pulsewatch-av56.onrender.com) - Backend service
 
 ## 🚀 **Deployment**
 

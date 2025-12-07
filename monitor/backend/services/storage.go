@@ -20,6 +20,7 @@ type StorageService struct {
 	websitesColl *mongo.Collection
 	statusesColl *mongo.Collection
 	sslColl      *mongo.Collection
+	usersColl    *mongo.Collection
 	databaseName string
 	mongoURI     string
 }
@@ -59,6 +60,7 @@ func (s *StorageService) ConnectMongoDB(uri, dbName string) error {
 	s.websitesColl = db.Collection("websites")
 	s.statusesColl = db.Collection("statuses")
 	s.sslColl = db.Collection("ssl")
+	s.usersColl = db.Collection("users")
 
 	log.Println("Connected to Mongo!")
 	return nil
@@ -265,5 +267,54 @@ func (s *StorageService) GetWebsitesCollection() *mongo.Collection {
 	return s.websitesColl
 }
 
-// --- The original JSON-specific file methods are now removed ---
-// saveWebsitesToFile() and saveStatusesToFile() are no longer part of this StorageService.
+// --- User Management ---
+
+// GetUser returns user settings by user ID
+func (s *StorageService) GetUser(userID string) (*models.User, error) {
+	var user models.User
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := s.usersColl.FindOne(ctx, bson.M{"_id": userID}).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil // User not found, return nil
+		}
+		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+	return &user, nil
+}
+
+// SaveUser saves or updates user settings
+func (s *StorageService) SaveUser(user models.User) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	user.UpdatedAt = time.Now().Unix()
+	if user.CreatedAt == 0 {
+		user.CreatedAt = user.UpdatedAt
+	}
+
+	_, err := s.usersColl.UpdateOne(
+		ctx,
+		bson.M{"_id": user.ID},
+		bson.M{"$set": user},
+		options.Update().SetUpsert(true),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to save user %s: %w", user.ID, err)
+	}
+	return nil
+}
+
+// GetUserDiscordWebhook returns the Discord webhook URL for a user
+func (s *StorageService) GetUserDiscordWebhook(userID string) (string, error) {
+	user, err := s.GetUser(userID)
+	if err != nil {
+		return "", err
+	}
+	if user == nil {
+		return "", nil // User not found, no webhook
+	}
+	return user.DiscordWebhookURL, nil
+}
