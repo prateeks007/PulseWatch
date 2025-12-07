@@ -209,6 +209,7 @@ Production:         MongoDB "pulsewatch_db_prod"   + Supabase Cloud Auth
 * Email, Slack, SMS alerts
 * Incident management system
 * API rate limiting
+* **Monitoring optimization** - Shared monitoring for popular sites to prevent rate limiting
 * Docker + Helm deployment
 * Prometheus + Grafana exporter
 * Mobile app (React Native)
