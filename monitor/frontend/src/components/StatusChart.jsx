@@ -15,8 +15,8 @@ import { ThemeContext } from "../context/ThemeContext";
 export default function StatusChart({ statuses, rangeHours = 3 }) {
   const { darkMode } = useContext(ThemeContext);
 
-  const data = useMemo(() => {
-    if (!Array.isArray(statuses) || statuses.length === 0) return [];
+  const { data, yAxisMax, outliers } = useMemo(() => {
+    if (!Array.isArray(statuses) || statuses.length === 0) return { data: [], yAxisMax: 'auto', outliers: [] };
     const sorted = [...statuses].sort((a, b) => a.checked_at - b.checked_at);
 
     const cutoffMs = Date.now() - rangeHours * 60 * 60 * 1000;
@@ -24,12 +24,32 @@ export default function StatusChart({ statuses, rangeHours = 3 }) {
     if (recent.length === 0) recent = sorted.slice(-100);
 
     // Map into chart data
-    return recent.map((s) => ({
+    const chartData = recent.map((s) => ({
       ts: s.checked_at * 1000,
       response: s.is_up ? s.response_time_ms : null,
       code: s.status_code ?? "N/A",
       is_up: !!s.is_up,
     }));
+
+    // Calculate smart Y-axis scaling
+    const validResponses = chartData.filter(d => d.response !== null).map(d => d.response);
+    if (validResponses.length === 0) return { data: chartData, yAxisMax: 'auto', outliers: [] };
+
+    const sortedResponses = [...validResponses].sort((a, b) => a - b);
+    const q75Index = Math.floor(sortedResponses.length * 0.75);
+    const q75 = sortedResponses[q75Index] || sortedResponses[sortedResponses.length - 1];
+    const maxNormal = Math.max(q75, sortedResponses[sortedResponses.length - 1]);
+    const smartMax = Math.ceil(maxNormal * 1.2);
+    
+    // Find outliers (responses > 3x the 75th percentile)
+    const outlierThreshold = q75 * 3;
+    const outlierPoints = chartData.filter(d => d.response && d.response > outlierThreshold);
+    
+    return { 
+      data: chartData, 
+      yAxisMax: smartMax,
+      outliers: outlierPoints
+    };
   }, [statuses, rangeHours]);
 
   // Build downtime ranges for shading
@@ -66,7 +86,7 @@ export default function StatusChart({ statuses, rangeHours = 3 }) {
   }
 
   const cardCls = [
-    "rounded-2xl p-3 h-80",
+    "rounded-lg p-3 h-80",
     darkMode ? "bg-gray-800/60" : "bg-white"
   ].join(" ");
 
@@ -112,7 +132,7 @@ export default function StatusChart({ statuses, rangeHours = 3 }) {
           <YAxis
             tick={{ fill: tickColor, fontSize: 12 }}
             stroke={gridColor}
-            domain={[0, "auto"]}
+            domain={[0, yAxisMax]}
             allowDecimals={false}
           />
 
@@ -125,11 +145,13 @@ export default function StatusChart({ statuses, rangeHours = 3 }) {
               boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
             }}
             labelFormatter={(ts) => new Date(ts).toLocaleString()}
-            formatter={(value, _, obj) =>
-              value == null
-                ? ["Offline", "Status"]
-                : [`${value} ms`, "Response"]
-            }
+            formatter={(value, _, obj) => {
+              if (value == null) return ["Offline", "Status"];
+              const isOutlier = outliers.some(o => o.ts === obj.payload.ts);
+              return isOutlier 
+                ? [`${value} ms ⚠️ Spike`, "Response"]
+                : [`${value} ms`, "Response"];
+            }}
           />
 
           <Line

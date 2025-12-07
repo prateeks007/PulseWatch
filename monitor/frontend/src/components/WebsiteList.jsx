@@ -22,12 +22,12 @@ export default function WebsiteList({ websites, selectedWebsite, onSelect, onDel
   const total = totalCount || showingCount;
 
   const containerCls = [
-    "rounded-2xl p-4 shadow-xl ring-1",
+    "rounded-lg p-4 shadow-xl ring-1",
     darkMode ? "bg-gray-900/70 ring-black/5" : "bg-white ring-black/10",
   ].join(" ");
 
   const baseRow =
-    "relative w-full text-left px-3 py-3 rounded-xl transition flex items-center gap-3 group";
+    "relative w-full text-left px-3 py-3 rounded-lg transition flex items-center gap-3 group";
 
   return (
     <div className={containerCls}>
@@ -77,10 +77,10 @@ export default function WebsiteList({ websites, selectedWebsite, onSelect, onDel
                 ? "bg-gray-800 ring-1 ring-blue-500/40"
                 : "bg-gray-100 ring-1 ring-blue-500/20"
               : darkMode
-              ? "bg-gray-800/50 hover:bg-gray-800"
-              : "bg-gray-50 hover:bg-gray-100",
+              ? "bg-gray-800/50 hover:bg-gray-700/80 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+              : "bg-gray-50 hover:bg-gray-100 hover:shadow-[0_0_15px_rgba(0,0,0,0.1)]",
             statusColor,
-            "hover:shadow-md hover:shadow-current/10 transition-all duration-200",
+            "transition-all duration-200 ease-out",
           ].join(" ");
 
           return (

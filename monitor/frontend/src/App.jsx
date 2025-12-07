@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import WebsiteList from './components/WebsiteList';
 import ThemeToggle from './components/ThemeToggle';
 import FilterBar from './components/FilterBar';
@@ -11,17 +12,20 @@ import DeleteConfirmModal from './components/DeleteConfirmModal';
 import LoadingSkeleton from './components/LoadingSkeleton';
 import ErrorBoundary from './components/ErrorBoundary';
 import UserSettings from './components/UserSettings';
+import OnboardingWizard from './components/OnboardingWizard';
 import { ThemeContext } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './components/ToastProvider';
 import { debounce } from 'lodash';
-import { AlertTriangle, RefreshCw, User, LogOut } from 'lucide-react';
+import { AlertTriangle, RefreshCw, User, LogOut, Settings, BarChart3 } from 'lucide-react';
+import DropdownMenu, { DropdownItem } from './components/DropdownMenu';
 import { calculateUptimePercentage } from './utils/uptimeCalculator';
 
 function App() {
   const { darkMode } = useContext(ThemeContext);
   const { user, signOut, getToken } = useAuth();
   const { addToast } = useToast();
+  const navigate = useNavigate();
 
   const [websites, setWebsites] = useState([]);
   const [selectedWebsite, setSelectedWebsite] = useState(null);
@@ -33,13 +37,14 @@ function App() {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({ status: 'all', maxResponseTime: null });
   const [searchTerm, setSearchTerm] = useState(''); // New search state
-  const [showSummary, setShowSummary] = useState(true);
+  const [showSummary, setShowSummary] = useState(false);
   const [rangeHours, setRangeHours] = useState(3);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [websiteToDelete, setWebsiteToDelete] = useState(null);
-  const [showDiscordSettings, setShowDiscordSettings] = useState(false);
+
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -129,9 +134,15 @@ function App() {
       setLatestStatusesAllSites(latestStatuses);
       setLoading(false);
 
-      if (!selectedWebsite && websitesWithStatus.length > 0) {
-        setSelectedWebsite(websitesWithStatus[0]);
-        fetchStatuses(websitesWithStatus[0].id);
+      // Show onboarding for new users with no websites
+      if (websitesWithStatus.length === 0) {
+        setShowOnboarding(true);
+      } else {
+        setShowOnboarding(false);
+        if (!selectedWebsite && websitesWithStatus.length > 0) {
+          setSelectedWebsite(websitesWithStatus[0]);
+          fetchStatuses(websitesWithStatus[0].id);
+        }
       }
     } catch (err) {
       setError('Failed to fetch websites');
@@ -283,6 +294,18 @@ function App() {
 
   const toggleSummary = () => setShowSummary(!showSummary);
 
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    fetchWebsites(); // Refresh to show the new website
+  };
+
+  // Show onboarding wizard for new users
+  if (showOnboarding) {
+    return (
+      <OnboardingWizard onComplete={handleOnboardingComplete} />
+    );
+  }
+
   if (loading) {
     return (
       <div className={`min-h-screen transition-colors duration-200 ${
@@ -345,74 +368,67 @@ function App() {
             <h1 className={`text-3xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>PulseWatch</h1>
             <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Monitor your websites in real-time</p>
           </div>
-          <div className="flex space-x-4 items-center">
-            <a
-              href="/status"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                darkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                  : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-200'
-              }`}
-            >
-              📊 Status Page
-            </a>
-            <button
-              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                darkMode ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }`}
-              onClick={() => setShowAddModal(true)}
-            >
-              + Add Website
-            </button>
-            <button
-              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                darkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                  : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-200'
-              }`}
-              onClick={toggleSummary}
-            >
-              {showSummary ? 'Hide Summary' : 'Show Summary'}
-            </button>
-            
-            <button
-              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                darkMode
-                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                  : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-200'
-              }`}
-              onClick={() => setShowDiscordSettings(!showDiscordSettings)}
-            >
-              🔔 Discord Alerts
-            </button>
-            
-            {/* User Profile */}
-            <div className="flex items-center space-x-3">
-              <div className={`flex items-center space-x-2 px-3 py-2 rounded ${
-                darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-800'
+          <div className="flex flex-wrap gap-2 sm:gap-4 items-center">
+            {/* Primary Action - Always Visible */}
+            <div className="flex items-center space-x-2">
+              <span className={`text-xs hidden sm:block ${
+                darkMode ? 'text-gray-400' : 'text-gray-500'
               }`}>
-                <User className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  {user?.email?.split('@')[0] || 'User'}
-                </span>
-              </div>
-              
+                {websites.length}/30
+              </span>
               <button
-                onClick={signOut}
-                className={`p-2 rounded text-sm font-medium transition-colors ${
-                  darkMode
-                    ? 'bg-red-600 hover:bg-red-500 text-white'
-                    : 'bg-red-500 hover:bg-red-600 text-white'
+                className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  websites.length >= 30
+                    ? 'bg-gray-400 cursor-not-allowed text-white'
+                    : darkMode ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'
                 }`}
-                title="Sign Out"
+                onClick={() => websites.length < 30 && setShowAddModal(true)}
+                disabled={websites.length >= 30}
+                title={websites.length >= 30 ? 'Free accounts limited to 30 websites' : 'Add new website'}
               >
-                <LogOut className="h-4 w-4" />
+                + Add Website
               </button>
-              
-              <ThemeToggle />
             </div>
+
+            {/* Settings Dropdown */}
+            <DropdownMenu trigger={<><Settings className="w-4 h-4" /><span className="hidden sm:inline">Settings</span></>}>
+              <DropdownItem 
+                onClick={toggleSummary}
+                icon={BarChart3}
+              >
+                {showSummary ? 'Hide Summary' : 'Show Summary'}
+              </DropdownItem>
+              <DropdownItem 
+                onClick={() => navigate('/settings')}
+                icon={() => <span className="text-sm">⚙️</span>}
+              >
+                Preferences
+              </DropdownItem>
+              <DropdownItem 
+                onClick={() => window.open('/status', '_blank')}
+                icon={() => <span className="text-sm">📊</span>}
+              >
+                Status Page
+              </DropdownItem>
+            </DropdownMenu>
+
+            {/* Profile Dropdown */}
+            <DropdownMenu trigger={<><User className="w-4 h-4" /><span className="hidden sm:inline">{user?.email?.split('@')[0] || 'User'}</span></>}>
+              <div className={`px-4 py-2 text-xs border-b ${
+                darkMode ? 'text-gray-400 border-gray-700' : 'text-gray-500 border-gray-200'
+              }`}>
+                {user?.email}
+              </div>
+              <DropdownItem 
+                onClick={signOut}
+                icon={LogOut}
+              >
+                Sign Out
+              </DropdownItem>
+            </DropdownMenu>
+
+            {/* Theme Toggle - Always Visible */}
+            <ThemeToggle />
           </div>
         </header>
 
@@ -425,13 +441,9 @@ function App() {
           />
         )}
 
-        {showDiscordSettings && (
-          <div className="mb-8">
-            <UserSettings />
-          </div>
+        {websites.length > 1 && (
+          <FilterBar filters={filters} setFilters={handleFilterChange} searchTerm={searchTerm} onSearch={setSearchTerm} />
         )}
-
-        <FilterBar filters={filters} setFilters={handleFilterChange} searchTerm={searchTerm} onSearch={setSearchTerm} />
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="md:col-span-1">

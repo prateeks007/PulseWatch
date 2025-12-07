@@ -103,17 +103,22 @@ export const AuthProvider = ({ children }) => {
 
   // Sign out function - logs out current user
   const signOut = async () => {
-    setLoading(true)
     try {
       const { error } = await supabase.auth.signOut()
-      if (error) throw error
+      if (error && error.message !== 'Auth session missing!') {
+        throw error
+      }
       
-      // Redirect to home page after successful logout
-      window.location.href = '/'
+      // Clear local state immediately
+      setSession(null)
+      setUser(null)
+      
+      // Auth state change will automatically redirect to /auth
     } catch (error) {
       console.error('Sign out error:', error)
-    } finally {
-      setLoading(false)
+      // Even if signOut fails, clear local state
+      setSession(null)
+      setUser(null)
     }
   }
 
