@@ -351,13 +351,9 @@ func main() {
 			})
 		}
 
-		// Check for duplicate URL (using normalized URLs)
-		allWebsites, err := storageService.GetWebsites()
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to check existing websites"})
-		}
+		// Check for duplicate URL within user's websites (using normalized URLs)
 		normalizedNewURL := utils.NormalizeURL(website.URL)
-		for _, existing := range allWebsites {
+		for _, existing := range existingWebsites {
 			normalizedExistingURL := utils.NormalizeURL(existing.URL)
 			if normalizedExistingURL == normalizedNewURL {
 				return c.Status(400).JSON(fiber.Map{

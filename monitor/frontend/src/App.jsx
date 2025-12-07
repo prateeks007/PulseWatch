@@ -11,6 +11,7 @@ import DeleteConfirmModal from './components/DeleteConfirmModal';
 import LoadingSkeleton from './components/LoadingSkeleton';
 import ErrorBoundary from './components/ErrorBoundary';
 import UserSettings from './components/UserSettings';
+import OnboardingWizard from './components/OnboardingWizard';
 import { ThemeContext } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './components/ToastProvider';
@@ -40,6 +41,7 @@ function App() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [websiteToDelete, setWebsiteToDelete] = useState(null);
   const [showDiscordSettings, setShowDiscordSettings] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -129,9 +131,15 @@ function App() {
       setLatestStatusesAllSites(latestStatuses);
       setLoading(false);
 
-      if (!selectedWebsite && websitesWithStatus.length > 0) {
-        setSelectedWebsite(websitesWithStatus[0]);
-        fetchStatuses(websitesWithStatus[0].id);
+      // Show onboarding for new users with no websites
+      if (websitesWithStatus.length === 0) {
+        setShowOnboarding(true);
+      } else {
+        setShowOnboarding(false);
+        if (!selectedWebsite && websitesWithStatus.length > 0) {
+          setSelectedWebsite(websitesWithStatus[0]);
+          fetchStatuses(websitesWithStatus[0].id);
+        }
       }
     } catch (err) {
       setError('Failed to fetch websites');
@@ -282,6 +290,18 @@ function App() {
   }, [filteredWebsites, selectedWebsite, statuses.length]);
 
   const toggleSummary = () => setShowSummary(!showSummary);
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    fetchWebsites(); // Refresh to show the new website
+  };
+
+  // Show onboarding wizard for new users
+  if (showOnboarding) {
+    return (
+      <OnboardingWizard onComplete={handleOnboardingComplete} />
+    );
+  }
 
   if (loading) {
     return (
