@@ -100,7 +100,10 @@ func main() {
 				fmt.Printf("  Error: %v\n", err)
 				// Only alert if status changed from up to down
 				if prevStatus, exists := previousStatuses[website.ID]; !exists || prevStatus {
-					discordService.SendAlert(website, false, 0)
+					// Get user's Discord webhook and send alert
+					if webhookURL, err := storageService.GetUserDiscordWebhook(website.UserID); err == nil && webhookURL != "" {
+						discordService.SendAlertToWebhook(webhookURL, website, false, 0)
+					}
 				}
 				previousStatuses[website.ID] = false
 			} else {
@@ -110,10 +113,15 @@ func main() {
 
 				// Only alert on status changes
 				if prevStatus, exists := previousStatuses[website.ID]; exists && prevStatus != status.IsUp {
-					discordService.SendAlert(website, status.IsUp, status.ResponseTime)
+					// Get user's Discord webhook and send alert
+					if webhookURL, err := storageService.GetUserDiscordWebhook(website.UserID); err == nil && webhookURL != "" {
+						discordService.SendAlertToWebhook(webhookURL, website, status.IsUp, status.ResponseTime)
+					}
 				} else if !exists && !status.IsUp {
 					// First check and it's down
-					discordService.SendAlert(website, false, status.ResponseTime)
+					if webhookURL, err := storageService.GetUserDiscordWebhook(website.UserID); err == nil && webhookURL != "" {
+						discordService.SendAlertToWebhook(webhookURL, website, false, status.ResponseTime)
+					}
 				}
 				previousStatuses[website.ID] = status.IsUp
 
@@ -391,6 +399,71 @@ func main() {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to delete website"})
 		}
 		return c.JSON(fiber.Map{"success": true})
+	})
+
+	// === USER SETTINGS ENDPOINTS ===
+	// These endpoints manage user-specific settings like Discord webhooks
+
+	// Get user settings (protected)
+	app.Get("/api/user/settings", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
+		userID := c.Locals("user_id").(string)
+		user, err := storageService.GetUser(userID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch user settings"})
+		}
+		if user == nil {
+			// Return default settings if user not found
+			return c.JSON(fiber.Map{
+				"discord_webhook_url": "",
+				"message": "To enable Discord alerts, add your webhook URL below",
+			})
+		}
+		return c.JSON(fiber.Map{
+			"discord_webhook_url": user.DiscordWebhookURL,
+			"message": func() string {
+				if user.DiscordWebhookURL == "" {
+					return "To enable Discord alerts, add your webhook URL below"
+				}
+				return "Discord alerts are enabled"
+			}(),
+		})
+	})
+
+	// Update user settings (protected)
+	app.Put("/api/user/settings", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
+		userID := c.Locals("user_id").(string)
+		
+		var requestBody struct {
+			DiscordWebhookURL string `json:"discord_webhook_url"`
+		}
+		
+		if err := c.BodyParser(&requestBody); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		}
+		
+		// Get existing user or create new one
+		user, err := storageService.GetUser(userID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch user"})
+		}
+		
+		if user == nil {
+			// Create new user
+			user = &models.User{
+				ID: userID,
+			}
+		}
+		
+		user.DiscordWebhookURL = requestBody.DiscordWebhookURL
+		
+		if err := storageService.SaveUser(*user); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to save user settings"})
+		}
+		
+		return c.JSON(fiber.Map{
+			"success": true,
+			"message": "Settings updated successfully",
+		})
 	})
 
 	// === PUBLIC STATUS PAGE ENDPOINTS ===

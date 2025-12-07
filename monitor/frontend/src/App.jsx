@@ -10,6 +10,7 @@ import AddWebsiteModal from './components/AddWebsiteModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import LoadingSkeleton from './components/LoadingSkeleton';
 import ErrorBoundary from './components/ErrorBoundary';
+import UserSettings from './components/UserSettings';
 import { ThemeContext } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
 import { useToast } from './components/ToastProvider';
@@ -38,6 +39,7 @@ function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [websiteToDelete, setWebsiteToDelete] = useState(null);
+  const [showDiscordSettings, setShowDiscordSettings] = useState(false);
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
@@ -375,6 +377,17 @@ function App() {
               {showSummary ? 'Hide Summary' : 'Show Summary'}
             </button>
             
+            <button
+              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                darkMode
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                  : 'bg-white hover:bg-gray-100 text-gray-800 border border-gray-200'
+              }`}
+              onClick={() => setShowDiscordSettings(!showDiscordSettings)}
+            >
+              🔔 Discord Alerts
+            </button>
+            
             {/* User Profile */}
             <div className="flex items-center space-x-3">
               <div className={`flex items-center space-x-2 px-3 py-2 rounded ${
@@ -410,6 +423,12 @@ function App() {
             statusesByWebsite={statusesByWebsite}
             rangeHours={rangeHours}
           />
+        )}
+
+        {showDiscordSettings && (
+          <div className="mb-8">
+            <UserSettings />
+          </div>
         )}
 
         <FilterBar filters={filters} setFilters={handleFilterChange} searchTerm={searchTerm} onSearch={setSearchTerm} />
