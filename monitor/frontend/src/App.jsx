@@ -372,7 +372,7 @@ function App() {
                 }`}
                 onClick={() => websites.length < 30 && setShowAddModal(true)}
                 disabled={websites.length >= 30}
-                title={websites.length >= 30 ? 'Free accounts limited to 30 websites' : 'Add new website'
+                title={websites.length >= 30 ? 'Free accounts limited to 30 websites' : 'Add new website'}
               >
                 + Add Website
               </button>

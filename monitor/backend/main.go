@@ -219,7 +219,8 @@ func main() {
 
 	// Get all websites (protected)
 	app.Get("/api/websites", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
-		websites, err := storageService.GetWebsites()
+		userID := c.Locals("user_id").(string)
+		websites, err := storageService.GetWebsitesByUser(userID)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites", "details": err.Error()})
 		}
@@ -229,36 +230,21 @@ func main() {
 	// Get website by ID (protected)
 	app.Get("/api/websites/:id", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
 		id := c.Params("id")
-		websites, err := storageService.GetWebsites()
+		userID := c.Locals("user_id").(string)
+		website, err := storageService.GetWebsiteByUser(id, userID)
 		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites", "details": err.Error()})
+			return c.Status(404).JSON(fiber.Map{"error": "Website not found"})
 		}
-
-		for _, website := range websites {
-			if website.ID == id {
-				return c.JSON(website)
-			}
-		}
-
-		return c.Status(404).JSON(fiber.Map{"error": "Website not found"})
+		return c.JSON(website)
 	})
 
 	// Get SSL info for a website (protected)
 	app.Get("/api/websites/:id/ssl", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
 		id := c.Params("id")
-		// find website
-		websites, err := storageService.GetWebsites()
+		userID := c.Locals("user_id").(string)
+		// find website (user-specific)
+		site, err := storageService.GetWebsiteByUser(id, userID)
 		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites", "details": err.Error()})
-		}
-		var site *models.Website
-		for _, w := range websites {
-			if w.ID == id {
-				site = &w
-				break
-			}
-		}
-		if site == nil {
 			return c.Status(404).JSON(fiber.Map{"error": "Website not found"})
 		}
 
@@ -279,7 +265,8 @@ func main() {
 
 	// Get SSL summary (protected)
 	app.Get("/api/ssl/summary", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
-		sites, err := storageService.GetWebsites()
+		userID := c.Locals("user_id").(string)
+		sites, err := storageService.GetWebsitesByUser(userID)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to fetch websites", "details": err.Error()})
 		}
@@ -365,12 +352,12 @@ func main() {
 		}
 
 		// Check for duplicate URL (using normalized URLs)
-		existingWebsites, err := storageService.GetWebsites()
+		allWebsites, err := storageService.GetWebsites()
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to check existing websites"})
 		}
 		normalizedNewURL := utils.NormalizeURL(website.URL)
-		for _, existing := range existingWebsites {
+		for _, existing := range allWebsites {
 			normalizedExistingURL := utils.NormalizeURL(existing.URL)
 			if normalizedExistingURL == normalizedNewURL {
 				return c.Status(400).JSON(fiber.Map{
@@ -413,7 +400,8 @@ func main() {
 	// Delete a website (protected)
 	app.Delete("/api/websites/:id", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
 		id := c.Params("id")
-		if err := storageService.DeleteWebsite(id); err != nil {
+		userID := c.Locals("user_id").(string)
+		if err := storageService.DeleteWebsiteByUser(id, userID); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to delete website"})
 		}
 		return c.JSON(fiber.Map{"success": true})
