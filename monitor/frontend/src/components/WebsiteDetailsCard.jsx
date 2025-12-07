@@ -45,7 +45,7 @@ export default function WebsiteDetailsCard({
   const isOnline = latest?.is_up;
 
   const cardCls = [
-    "rounded-2xl p-5 shadow-xl ring-1",
+    "rounded-lg p-5 shadow-xl ring-1",
     darkMode ? "bg-gray-900/70 ring-black/5" : "bg-white ring-black/10",
   ].join(" ");
 
@@ -57,8 +57,8 @@ export default function WebsiteDetailsCard({
     : "text-sm text-gray-500";
 
   const statWrapCls = darkMode
-    ? "bg-gray-800/70 rounded-xl p-4"
-    : "bg-gray-50 rounded-xl p-4";
+    ? "bg-gray-800/70 rounded-lg p-4"
+    : "bg-gray-50 rounded-lg p-4";
 
   const statLabelCls = darkMode
     ? "text-xs text-gray-400 mb-1"
