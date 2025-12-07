@@ -1,28 +1,58 @@
 # PulseWatch
 
-PulseWatch is a lightweight yet powerful website uptime and health monitor built with Go. It allows you to monitor multiple websites, run periodic checks, and persist results using MongoDB Atlas. Designed to be simple, extensible, and ready for real-world use.
+PulseWatch is a professional-grade website uptime and health monitoring platform built with Go and React. Monitor multiple websites, track performance metrics, and get instant alerts when issues occur. Features a stunning dashboard and public status pages that rival industry leaders like GitHub Status and Vercel Status.
 
 ## 🚀 Features
 
-* ✅ HTTP/HTTPS website uptime checks
-* ⏰ Configurable intervals (per-site)
-* 📦 MongoDB Atlas integration for scalable storage
-* 🔄 Cron-based periodic execution
-* 💡 Pluggable storage (easily extend to Redis, SQL, etc.)
-* 📈 Real-time console logs
-* 🚨 **Discord alerts** - Get notified when sites go up/down
+### **Core Monitoring**
+* ✅ **HTTP/HTTPS uptime monitoring** - Real-time website health checks
+* ⏰ **Configurable intervals** - Custom check frequency per website
+* 📊 **Response time tracking** - Monitor performance trends
 * 🔒 **SSL certificate monitoring** - Track certificate expiry dates
-* 📁 **Modern React dashboard** - Beautiful real-time UI with dark/light themes
-* 📊 **Charts & analytics** - Response time graphs and uptime statistics
+* 📈 **Uptime statistics** - 24h and 7-day uptime percentages
+
+### **Alerting & Notifications**
+* 🚨 **Discord alerts** - Instant notifications when sites go up/down
 * 🛡️ **Smart alerting** - Only alerts on status changes (no spam)
+* 📱 **Real-time updates** - Live dashboard updates every 10 seconds
+
+### **Dashboard & UI**
+* 📁 **Modern React dashboard** - Beautiful, responsive admin interface
+* 🌙 **Dark/light themes** - Automatic theme switching with user preference
+* 📊 **Interactive charts** - Response time graphs and uptime analytics
+* 🔍 **Search & filtering** - Find websites quickly with advanced filters
+* 📱 **Mobile responsive** - Works perfectly on all devices
+
+### **Authentication & Security**
+* 🔐 **JWT authentication** - Secure user sessions with Supabase
+* 👥 **Multi-user support** - Each user sees only their websites
+* 🛡️ **Protected admin APIs** - JWT validation on all admin endpoints
+* 🌐 **Public status pages** - No authentication required for status viewing
+* 🔒 **User data isolation** - Complete separation between user accounts
+
+### **Public Status Pages**
+* 🌐 **Professional status pages** - Public-facing status like GitHub/Vercel
+* 🎨 **Stunning animations** - 3D effects, gradients, and smooth transitions
+* 📊 **Service history** - Click any service to see detailed 24h history
+* 🔄 **Auto-refresh** - Real-time updates every 30 seconds
+* 🎯 **No authentication required** - Perfect for sharing with customers
+
+### **Architecture & Deployment**
+* 📦 **MongoDB Atlas integration** - Scalable cloud database storage
+* 🔄 **Cron-based execution** - Reliable background monitoring
+* 💡 **Pluggable storage** - Easily extend to other databases
+* 🚀 **Production ready** - Deployed on Render with auto-scaling
+* 🔧 **Keep-alive system** - Prevents free tier spin-downs
 
 ---
 
 ## 📦 Requirements
 
-* Go 1.18+
-* MongoDB Atlas (Free Tier is fine)
-* Node.js (for the frontend)
+* **Go 1.18+** - Backend API and monitoring service
+* **Node.js 16+** - Frontend React application
+* **MongoDB Atlas** - Cloud database (Free tier supported)
+* **Supabase** - Authentication service (Free tier supported)
+* **Discord Webhook** - For notifications (Optional)
 
 ---
 
@@ -31,95 +61,184 @@ PulseWatch is a lightweight yet powerful website uptime and health monitor built
 ### 1. Clone the Repo
 
 ```bash
-git clone [https://github.com/prateeks007/PulseWatch.git](https://github.com/prateeks007/PulseWatch.git)
+git clone https://github.com/prateeks007/PulseWatch.git
 cd PulseWatch
-````
+```
 
-### 2\. Setup MongoDB Atlas
+### 2. Setup MongoDB Atlas
 
-  * Create a free cluster: [https://cloud.mongodb.com](https://cloud.mongodb.com)
+* Create a free cluster: [https://cloud.mongodb.com](https://cloud.mongodb.com)
+* Add a user and whitelist your IP (or use 0.0.0.0/0 for development)
+* Copy your connection string:
 
-  * Add a user and whitelist your IP.
+```
+mongodb+srv://<user>:<pass>@cluster0.mongodb.net/?retryWrites=true&w=majority
+```
 
-  * Copy your connection string. It should look something like this:
+### 3. Setup Supabase Authentication
 
-  `  mongodb+srv://<user>:<pass>@cluster0.mongodb.net/pulsewatch?retryWrites=true&w=majority  `
+* Create a free project: [https://supabase.com](https://supabase.com)
+* Go to Settings → API to get your keys
+* Copy the Project URL and anon public key
 
-  * Create a `.env` file in the root of the project to store your connection details:
+### 4. Environment Configuration
 
-  ` env   MONGO_URI="your-connection-uri"   MONGO_DB_NAME="pulsewatch_db"    `
+Create a `.env` file in the root directory:
 
-  * **Note:** The `pulsewatch_db` database and its collections will be automatically created on the first run.
-  * **Discord Alerts (Optional):** Create a Discord webhook in your server settings to receive notifications when websites go up/down.
+```env
+# MongoDB Configuration
+MONGO_URI="your-mongodb-connection-string"
+MONGO_DB_NAME="pulsewatch_db_local"  # Use different names for local/prod
 
-### 3\. Setup and Run the Backend
+# Supabase Authentication
+SUPABASE_URL="https://your-project.supabase.co"
+SUPABASE_JWT_SECRET="your-jwt-secret-from-supabase-settings"
 
-The backend is located in the `monitor/backend` directory, but the main entry point is at the project root.
+# Discord Notifications (Optional)
+DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/your-webhook-url"
+```
 
-  * Download the Go dependencies from the project root:
-      ` bash   go mod tidy    `
+Create `monitor/frontend/.env.local` for frontend:
 
-  * Build the backend executable from the project root:
-      ` bash   go build -o pulsewatch-api ./monitor/backend    `
+```env
+VITE_API_BASE_URL="http://localhost:3000"
+VITE_SUPABASE_URL="https://your-project.supabase.co"
+VITE_SUPABASE_ANON_KEY="your-anon-public-key"
+```
 
-  * Run the backend server from the project root:
-      ` bash   ./pulsewatch-api    `
+### 5. Setup and Run the Backend
 
-  * This will start the cron scheduler and the API server on `http://localhost:3000`.
+```bash
+# Install Go dependencies
+go mod tidy
 
-### 4\. Setup and Run the Frontend
+# Run the backend server
+go run ./monitor/backend
+```
 
-  * Navigate to the frontend directory:
-      ` bash   cd monitor/frontend    `
+This starts:
+- 🔄 **Cron scheduler** - Monitors websites every minute
+- 🌐 **API server** - REST API on `http://localhost:3000`
+- 💓 **Keep-alive service** - Prevents deployment spin-downs
+- 🔒 **SSL monitoring** - Daily certificate checks
 
-  * Install the Node.js dependencies:
-      ` bash   npm install    `
+### 6. Setup and Run the Frontend
 
-  * Run the frontend development server:
-      ` bash   npm run dev    `
+```bash
+# Navigate to frontend directory
+cd monitor/frontend
 
-  * This will open your web browser to the frontend dashboard, which will communicate with your backend API.
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+This opens:
+- 📊 **Admin Dashboard** - `http://localhost:5173/dashboard`
+- 🌐 **Public Status Page** - `http://localhost:5173/status`
 
 -----
 
 ## 🧩 Architecture
 
 ```
-[ Frontend (Web UI) ] ----API Calls----> [ Go Backend (Fiber API) ]
-                               |
-                              [ MonitorService ]
-                               |
-                              [ StorageService ]
-                               |
-                           [ Data: MongoDB Atlas ]
+┌─────────────────────┐    ┌──────────────────────┐    ┌─────────────────────┐
+│   React Frontend    │    │    Go Backend API    │    │   External Services │
+│                     │    │                      │    │                     │
+│ • Admin Dashboard   │◄──►│ • Fiber REST API     │◄──►│ • MongoDB Atlas     │
+│ • Public Status     │    │ • JWT Validation     │    │ • Supabase Auth     │
+│ • Authentication    │    │ • Cron Scheduler     │    │ • Discord Webhooks  │
+│ • Real-time Updates │    │ • Monitor Service    │    │ • SSL Certificates  │
+└─────────────────────┘    └──────────────────────┘    └─────────────────────┘
 ```
 
-  * All storage is handled through an interface.
-  * MongoDB is used as the primary backend for data persistence.
-  * A cron scheduler runs periodic checks via the `MonitorService`.
-
------
-
-## 📈 Future Plans
-
-  * ~~Web dashboard with charts~~ ✅ **DONE**
-  * ~~Alerting: Discord~~ ✅ **DONE** 
-  * Email, Slack, SMS alerts
-  * User authentication (multi-tenant)
-  * Data cleanup and retention policies
-  * Docker + Helm deployment
-  * Prometheus + Grafana exporter
-
------
-
-## 🤝 Contributing
-
-Pull requests are welcome. Open issues for bugs or features.
-
------
-
-## 📜 License
-
-[MIT License](https://www.google.com/search?q=LICENSE)
-
+### **Multi-User Data Flow**
 ```
+1. User authenticates → Supabase returns JWT token
+2. Frontend sends JWT with API requests → Go backend
+3. Backend validates JWT → Extracts user_id
+4. Database queries filtered by user_id → MongoDB Atlas
+5. User sees only their websites and data
+```
+
+### **Environment Separation**
+```
+Local Development:  MongoDB "pulsewatch_db_local"  + Supabase Cloud Auth
+Production:         MongoDB "pulsewatch_db_prod"   + Supabase Cloud Auth
+                    (Same auth, separate data)
+```
+
+-----
+
+## 🎯 **Current Status & Roadmap**
+
+### **✅ Completed Features**
+* ~~Web dashboard with charts~~ ✅ **DONE**
+* ~~Alerting: Discord~~ ✅ **DONE** 
+* ~~SSL certificate monitoring~~ ✅ **DONE**
+* ~~Public status pages~~ ✅ **DONE**
+* ~~Dark/light themes~~ ✅ **DONE**
+* ~~Real-time updates~~ ✅ **DONE**
+* ~~Data cleanup and retention~~ ✅ **DONE**
+* ~~Production deployment~~ ✅ **DONE**
+* ~~User authentication (Supabase integration)~~ ✅ **DONE**
+* ~~Multi-tenant architecture~~ ✅ **DONE**
+
+### **🚧 In Progress**
+* Custom status page domains
+
+### **📋 Future Plans**
+* Email, Slack, SMS alerts
+* Incident management system
+* API rate limiting
+* Docker + Helm deployment
+* Prometheus + Grafana exporter
+* Mobile app (React Native)
+* Advanced analytics & reporting
+
+-----
+
+## 🌐 **Live Demo**
+
+* **Admin Dashboard**: [https://pulse-watch.vercel.app](https://pulse-watch.vercel.app)
+* **Public Status Page**: [https://pulse-watch.vercel.app/status](https://pulse-watch.vercel.app/status)
+* **Backend API**: [https://pulsewatch-av56.onrender.com](https://pulsewatch-av56.onrender.com)
+
+## 🚀 **Deployment**
+
+### **Frontend (Vercel)**
+```bash
+# Build and deploy
+npm run build
+vercel --prod
+```
+
+### **Backend (Render)**
+```bash
+# Auto-deploys from GitHub
+# Set environment variables in Render dashboard
+```
+
+## 🤝 **Contributing**
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📜 **License**
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 **Acknowledgments**
+
+* Built with [Go](https://golang.org/) and [Fiber](https://gofiber.io/)
+* Frontend powered by [React](https://reactjs.org/) and [Tailwind CSS](https://tailwindcss.com/)
+* Authentication by [Supabase](https://supabase.com/)
+* Database hosted on [MongoDB Atlas](https://www.mongodb.com/atlas)
+* Deployed on [Render](https://render.com/) and [Vercel](https://vercel.com/)

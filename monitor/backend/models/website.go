@@ -12,6 +12,7 @@ type Website struct {
 	Name     string `json:"name" bson:"name"`         // Display name
 	URL      string `json:"url" bson:"url"`           // Full URL to check
 	Interval int    `json:"interval" bson:"interval"` // Check interval in seconds
+	UserID   string `json:"user_id" bson:"user_id"`   // Supabase user ID who owns this website
 }
 
 // WebsiteStatus represents the result of checking a website

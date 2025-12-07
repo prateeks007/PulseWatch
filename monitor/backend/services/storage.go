@@ -85,6 +85,28 @@ func (s *StorageService) GetWebsites() ([]models.Website, error) {
 	return sites, nil
 }
 
+// GetWebsitesByUser returns websites filtered by user_id
+func (s *StorageService) GetWebsitesByUser(userID string) ([]models.Website, error) {
+	var sites []models.Website
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cursor, err := s.websitesColl.Find(ctx, bson.M{"user_id": userID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to find websites for user %s: %w", userID, err)
+	}
+	defer func() {
+		if err := cursor.Close(ctx); err != nil {
+			log.Printf("⚠️ Failed to close cursor: %v", err)
+		}
+	}()
+
+	if err := cursor.All(ctx, &sites); err != nil {
+		return nil, fmt.Errorf("failed to decode websites for user %s: %w", userID, err)
+	}
+	return sites, nil
+}
+
 func (s *StorageService) SaveWebsite(website models.Website) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -190,6 +212,47 @@ func (s *StorageService) DeleteWebsite(id string) error {
 		log.Printf("DeleteWebsite ssl delete error: %v", err)
 	}
 	return nil
+}
+
+// DeleteWebsiteByUser deletes a website only if it belongs to the user
+func (s *StorageService) DeleteWebsiteByUser(id, userID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Delete only if the website belongs to the user
+	result, err := s.websitesColl.DeleteOne(ctx, bson.M{"_id": id, "user_id": userID})
+	if err != nil {
+		log.Printf("DeleteWebsiteByUser websites delete error: %v", err)
+		return err
+	}
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("website not found or access denied")
+	}
+
+	// Clean up related data
+	if _, err := s.statusesColl.DeleteMany(ctx, bson.M{"website_id": id}); err != nil {
+		log.Printf("DeleteWebsiteByUser statuses delete error: %v", err)
+	}
+	if _, err := s.sslColl.DeleteOne(ctx, bson.M{"website_id": id}); err != nil {
+		log.Printf("DeleteWebsiteByUser ssl delete error: %v", err)
+	}
+	return nil
+}
+
+// GetWebsiteByUser returns a website only if it belongs to the user
+func (s *StorageService) GetWebsiteByUser(id, userID string) (*models.Website, error) {
+	var website models.Website
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := s.websitesColl.FindOne(ctx, bson.M{"_id": id, "user_id": userID}).Decode(&website)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("website not found or access denied")
+		}
+		return nil, fmt.Errorf("failed to find website: %w", err)
+	}
+	return &website, nil
 }
 
 // GetStatusesCollection returns the statuses collection for cleanup service

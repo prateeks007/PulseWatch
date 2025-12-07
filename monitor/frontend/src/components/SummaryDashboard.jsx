@@ -1,5 +1,6 @@
 import React, { useContext, useMemo, useEffect, useState } from "react";
 import { ThemeContext } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 import { Globe, CheckCircle, Clock, Zap, Shield, TrendingUp, Activity } from "lucide-react";
 import StatusIndicator from "./StatusIndicator";
 import axios from "axios";
@@ -14,14 +15,22 @@ function SummaryDashboard({
     const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
   const { darkMode } = useContext(ThemeContext);
+  const { getToken } = useAuth();
   const [sslSummary, setSslSummary] = useState(null);
 
   useEffect(() => {
-    axios
-      .get(`${API_BASE_URL}/api/ssl/summary`)
-      .then((res) => setSslSummary(res.data))
-      .catch(() => setSslSummary(null));
-  }, [websites]);
+    const fetchSSLSummary = async () => {
+      try {
+        const token = await getToken();
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await axios.get(`${API_BASE_URL}/api/ssl/summary`, { headers });
+        setSslSummary(res.data);
+      } catch (error) {
+        setSslSummary(null);
+      }
+    };
+    fetchSSLSummary();
+  }, [websites, getToken]);
 
   const totalWebsites = websites.length;
   const onlineWebsites = websites.filter((w) => w.lastStatus === true).length;
