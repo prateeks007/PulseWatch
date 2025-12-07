@@ -334,6 +334,20 @@ func main() {
 
 	// Add a new website (protected)
 	app.Post("/api/websites", middleware.AuthMiddleware(), func(c *fiber.Ctx) error {
+		userID := c.Locals("user_id").(string)
+		
+		// Check website limit (30 websites per user)
+		existingWebsites, err := storageService.GetWebsitesByUser(userID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to check existing websites"})
+		}
+		if len(existingWebsites) >= 30 {
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Website limit reached",
+				"message": "Free accounts are limited to 30 websites. Please upgrade for more.",
+			})
+		}
+		
 		var website models.Website
 		if err := c.BodyParser(&website); err != nil {
 			return c.Status(400).JSON(fiber.Map{
@@ -373,9 +387,13 @@ func main() {
 		if website.ID == "" {
 			website.ID = fmt.Sprintf("%d", time.Now().UnixNano())
 		}
-		if website.Interval == 0 {
+		// Enforce minimum interval (60 seconds)
+		if website.Interval == 0 || website.Interval < 60 {
 			website.Interval = 60
 		}
+		
+		// Set user ID
+		website.UserID = userID
 
 		if err := storageService.SaveWebsite(website); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to save website"})

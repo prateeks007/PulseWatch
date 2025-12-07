@@ -358,14 +358,25 @@ function App() {
             >
               📊 Status Page
             </a>
-            <button
-              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
-                darkMode ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }`}
-              onClick={() => setShowAddModal(true)}
-            >
-              + Add Website
-            </button>
+            <div className="flex items-center space-x-2">
+              <span className={`text-xs ${
+                darkMode ? 'text-gray-400' : 'text-gray-500'
+              }`}>
+                {websites.length}/30 websites
+              </span>
+              <button
+                className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  websites.length >= 30
+                    ? 'bg-gray-400 cursor-not-allowed text-white'
+                    : darkMode ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
+                onClick={() => websites.length < 30 && setShowAddModal(true)}
+                disabled={websites.length >= 30}
+                title={websites.length >= 30 ? 'Free accounts limited to 30 websites' : 'Add new website'
+              >
+                + Add Website
+              </button>
+            </div>
             <button
               className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
                 darkMode
