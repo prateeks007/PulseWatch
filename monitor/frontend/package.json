@@ -12,7 +12,7 @@
     "lodash": "^4.17.21",
     "lucide-react": "^0.534.0",
     "react": "^18.2.0",
-    "react-chartjs-2": "^5.2.0",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.9.6",
     "recharts": "^2.11.0",
